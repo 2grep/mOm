@@ -30,23 +30,29 @@ observers = list(case_observer_matrix.columns)[1:]
 observers = observers[:(len(observers) - 2)]
 print(observers)
 def match(series, observers):
-        prev = observers[0]
-        for observer in observers[1:(len(observers) - 1)]:
-            # if the observations are different
-            if series[observer] != series[prev]:
-                return False
-            prev = observer
-        return True
+    '''
+    All observer columns of series matching
+    1 if all observers match, else 0
+    '''
+    prev = observers[0]
+    for observer in observers[1:(len(observers) - 1)]:
+        # if the observations are different
+        if series[observer] != series[prev]:
+            return 0
+        prev = observer
+    return 1
+
+    # Alternative possible solution, but harder to extend to fractional agreements:
+    a = series[observers].to_numpy()
+    return 1 if (a[0] == a).all() else 0
+
 
 def overall_proportion_agreement(case_observer_matrix, observers):
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for O_x observers.
     '''
-    cases = len(case_observer_matrix.index)
-    
-    observers = ["A", "B", "C"]
-        
-    return case_observer_matrix.apply(match, args=(observers,), axis=1).value_counts()[True] / cases
+    #                                                             number of full row-matches / number of cases
+    return case_observer_matrix.apply(match, args=(observers,), axis=1).sum() / len(case_observer_matrix.index)
 
 print(overall_proportion_agreement(case_observer_matrix, observers))
 
@@ -64,88 +70,12 @@ def onest(case_observer_matrix, C, O_max):
     ]
     '''
 
+    # TODO:
+    # create C random, unique orders of O_max observers, e.g. ['C', 'Q', 'L', 'R', etc]
+    # cumulatively run OPA for each observer in each random order e.g. ['C', 'Q'] -> ['C', 'Q', 'L'] -> ['C', 'Q', 'L', 'R'] -> ...
+    # There are probably some safety conditions:
+    #    C shouldn't exceed factorial of O_m
+    #    O_max can't exceed O_m
+    # Possible min-max epsilon or min/max/median plateau epsilon to allow quitting before hitting O_max
 
-     
-
-def overall_percent_agreement(case_observer_matrix, observers):
-    '''
-    overall_percent_agreement is a synonym for overall_proportion_agreement()
-    ''' 
-    return overall_proportion_agreement(case_observer_matrix, observers)
-
-def generalized_precision(conf_matrix, weights, label_num):
-    '''
-    Generalized precision is computed for a specific label. For a given label, it computes a measure of all the label's predicted instances which were correctly labelled.
-    '''
-    row = conf_matrix[label_num]
-
-    if sum(row) == 0:
-        raise("No elements with that predicted label")
-
-    score = 0
-    show_work = "("
-    for i, x in enumerate(row):
-        score += x * weights[label_num][i]
-
-        # to print out the work
-        show_work += ("{} * {:.2f}").format(x, weights[label_num][i])
-        if i != len(row) - 1:
-            show_work += (" + ")
-        else:
-            show_work += (") / ({}) = ").format(sum(row))
-        # to print out the work
-
-    gen_prec = score / sum(row)
-    print(show_work, gen_prec)
-    return gen_prec
-
-## BUILD WEIGHTS MATRICES ##
-# Similar to conf_matrix, it may be useful to have various weights matrices to
-# swap in.
-
-weights_naive = [[1,0,0,0,0], 
-                 [0,1,0,0,0], 
-                 [0,0,1,0,0], 
-                 [0,0,0,1,0], 
-                 [0,0,0,0,1]]
-
-weights_sym_shallow = [[1.0,0.9,0.5,0.1,0.0], 
-                       [0.9,1.0,0.9,0.5,0.1], 
-                       [0.5,0.9,1.0,0.9,0.5], 
-                       [0.1,0.5,0.9,1.0,0.9], 
-                       [0.0,0.1,0.5,0.9,1.0]]
-
-weights_sym_steep = [[1.0,0.9,0.1,0.0,0.0], 
-                     [0.9,1.0,0.9,0.1,0.0], 
-                     [0.1,0.9,1.0,0.9,0.1], 
-                     [0.0,0.1,0.9,1.0,0.9], 
-                     [0.0,0.0,0.1,0.9,1.0]]
-
-weights_manual = [[1.0,0.9,0.2,0.1,0.1], 
-                  [0.9,1.0,0.9,0.2,0.2], 
-                  [0.2,0.5,1.0,0.9,0.2], 
-                  [0.0,0.1,0.9,1.0,0.9], 
-                  [0.0,0.1,0.2,0.9,1.0]]
-
-## MAIN: CALCULATE THE FIGURES OF MERIT ##
-# Confusion matrix follows the convention here
-# https://i.stack.imgur.com/a3hnS.png. The element in the ith row and jth column
-# is the the number of elements with ground truth j which were classified as i 
-# by the model.
-
-# Confusion matrix must have num_classes rows and columns. All elements should
-# be non-negative integers.
-
-num_classes = 5
-conf_matrix = confusion_matrix_A.to_numpy(dtype=int)
-weights = weights_sym_steep
-
-print(conf_matrix)
-print(weights)
-print(sum([sum(r) for r in conf_matrix]))
-for i in range(num_classes):
-  print("Gen. Precision for label", i)
-  generalized_precision(conf_matrix, weights, i)
-  print("Gen. Recall for label", i)
-  generalized_recall(conf_matrix, weights, i)
-  print("Overall Gen. Accuracy:", generalized_accuracy(conf_matrix, weights))
+## MAIN: Print graphs##
