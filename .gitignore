@@ -8,6 +8,10 @@ __pycache__/
 
 # venv
 mom/
+bin/
+include/
+lib/
+pyvenv.cfg
 
 #bibliography
 *.pdf
