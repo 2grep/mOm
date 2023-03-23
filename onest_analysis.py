@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-import matplotlib as plt
+import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import random as random
 from pprint import pprint
 
@@ -18,14 +19,12 @@ from pprint import pprint
 # empty rows and NaN cells and delete them:
 # https://stackoverflow.com/a/17092718
 
-case_observer_matrix = pd.read_csv('./prostate_assisted.csv')
-#print(case_observer_matrix.nunique())
-case_observer_matrix.head(15)
-#confusion_matrix = pd.crosstab(case_observer_matrix['GU_majority_Ground_truth'], case_observer_matrix['B'], rownames=['Actual'], colnames=['Predicted'])
-#print(confusion_matrix)
-#Hacks for our janky input to drop the columns case(random), GU_majority_Ground_truth, and Model_pred
-observers = list(case_observer_matrix.columns)
-#print(observers)
+assisted_case_observer_matrix = pd.read_csv('./prostate_assisted.csv')
+assisted_case_observer_matrix.head(15)
+observers = list(assisted_case_observer_matrix.columns)
+
+unassisted_case_observer_matrix = pd.read_csv('./prostate_unassisted.csv')
+unassisted_case_observer_matrix.head(15)
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here: 
@@ -44,10 +43,11 @@ def match(case, observers, fractional=False):
     '''
     if not fractional:
         first = case[observers[0]]
-        for observer in observers[1:(len(observers) - 1)]:
+        for observer in observers[1:len(observers)]:
             # if the observations are different
             if case[observer] != first:
                 return 0
+
         return 1
 
         # Alternative (probably fater) method if we have MANY observers, just less readable
@@ -56,6 +56,7 @@ def match(case, observers, fractional=False):
     
     else:
         return case[observers].value_counts().max() / len(observers)
+
 
 def overall_proportion_agreement(case_observer_matrix, observers):
     '''
@@ -85,7 +86,7 @@ def onest(case_observer_matrix, unique_curves, O_max):
     # slicing is exclusive, we assume O_max is inclusive (if you want to use 10 observers, you get 10 observers / 9 OPAs)
     O_max += 1
 
-    onest = []
+    onest = pd.DataFrame()
     observer_lists = []
     all_observers = list(case_observer_matrix.columns)
 
@@ -100,19 +101,43 @@ def onest(case_observer_matrix, unique_curves, O_max):
         observer_lists.append(observers_for_this_curve.copy())
        
         curve = []
+
         for index in range(2, len(observers_for_this_curve)):
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
 
-        onest.append(curve)
+        onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
 
     return onest
     
-pprint(onest(case_observer_matrix, 10, 10))
+onest_assisted_df = onest(assisted_case_observer_matrix, 100, 20)
+onest_unassisted_df = onest(unassisted_case_observer_matrix, 100, 20)
 
-# TODO: prep for plotting
-#     
+assisted_description = onest_assisted_df.describe()
+pprint(assisted_description)
 
-    # TODO:
-    # Possible min-max epsilon or min/max/median plateau epsilon to allow quitting before hitting O_max
+pprint(onest_assisted_df)   
+pprint(onest_unassisted_df)  
 
-## MAIN: Print graphs##
+lines = onest_assisted_df.plot.line(
+    style="o-", 
+    color="#B10202", 
+    legend=False, 
+    fillstyle="none", 
+    linewidth=.5
+)
+
+onest_unassisted_df.plot.line(
+    style="o-", 
+    color="#008000", 
+    legend=False, 
+    fillstyle="none", 
+    linewidth=.5, 
+    ax=lines
+)
+
+
+lines.xaxis.set_major_locator(MultipleLocator(6))
+lines.xaxis.set_major_formatter('{x:.0f}')
+lines.set_xlim([onest_assisted_df.index[0], onest_assisted_df.index[-1]])
+lines.set_ylim([0, 1])
+plt.show()
