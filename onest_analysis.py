@@ -112,32 +112,57 @@ def onest(case_observer_matrix, unique_curves, O_max):
 onest_assisted_df = onest(assisted_case_observer_matrix, 100, 20)
 onest_unassisted_df = onest(unassisted_case_observer_matrix, 100, 20)
 
-assisted_description = onest_assisted_df.describe()
+assisted_description = onest_assisted_df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
 pprint(assisted_description)
+unassisted_description = onest_unassisted_df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+pprint(unassisted_description)
 
 pprint(onest_assisted_df)   
 pprint(onest_unassisted_df)  
 
-lines = onest_assisted_df.plot.line(
+all_OPAs = onest_assisted_df.plot.line(
     style="o-", 
     color="#B10202", 
     legend=False, 
     fillstyle="none", 
     linewidth=.5
 )
-
 onest_unassisted_df.plot.line(
     style="o-", 
     color="#008000", 
     legend=False, 
     fillstyle="none", 
     linewidth=.5, 
-    ax=lines
+    ax=all_OPAs
+)
+
+pprint(assisted_description)
+envelope_OPAs = assisted_description.plot.line(
+    style="-", 
+    color="#B10202", 
+    legend=False, 
+    fillstyle="none", 
+    linewidth=1
+)
+unassisted_description.plot.line(
+    style="-", 
+    color="#008000", 
+    legend=False, 
+    fillstyle="none", 
+    linewidth=1,
+    ax=envelope_OPAs
 )
 
 
-lines.xaxis.set_major_locator(MultipleLocator(6))
-lines.xaxis.set_major_formatter('{x:.0f}')
-lines.set_xlim([onest_assisted_df.index[0], onest_assisted_df.index[-1]])
-lines.set_ylim([0, 1])
+
+all_OPAs.xaxis.set_major_locator(MultipleLocator(6))
+all_OPAs.xaxis.set_major_formatter('{x:.0f}')
+all_OPAs.set_xlim([onest_assisted_df.index[0], onest_assisted_df.index[-1]])
+all_OPAs.set_ylim([0, 1])
+
+envelope_OPAs.xaxis.set_major_locator(MultipleLocator(6))
+envelope_OPAs.xaxis.set_major_formatter('{x:.0f}')
+envelope_OPAs.set_xlim([assisted_description.index[0], assisted_description.index[-1]])
+envelope_OPAs.set_ylim([0, 1])
+
 plt.show()
