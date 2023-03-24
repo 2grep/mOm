@@ -1,3 +1,5 @@
+#!usr/bin/env python3
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,34 +7,38 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import random as random
 from pprint import pprint
 
-## BUILD CONFUSION MATRIX ##
-# The main return uses the confusion matrix conf_matrix, however, there are
-# potentially many confusion matrices that could be set up, for example the
-# Steiner 2020 Fig 2D multi-reader dataset affords the opportunity to generate
-# many confusion matrices.  So it may be useful to extract various confusion
-# matrices from the data, and swap them into the final conf_matrix as we figure
-# out what it is we want to draft.
-#
-# This crosstab method of constructing a confusion matrix from here:
-# https://datatofish.com/confusion-matrix-python/. This works as long as all
-# cells are populated. For production, may need to check for the input for 
-# empty rows and NaN cells and delete them:
-# https://stackoverflow.com/a/17092718
+## ARGUMENTS ##
+# TODO: convert unique_curves and o_max to inputted values
+# TODO: add verbosity option
+# 0 - print nothing, just make the graph
+# 1 - print curve generation progress (preferably as loading bar)
+#       Progress: |█████████████████████████████████████████████-----| 90/100 Curve(s) Complete 
+#       (https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020)
+# TODO: defeat entropy and make dev mode where it uses a pre-made set of obervers with each run rather than regenerating each time
+# TODO!: add in ga and esi support
 
-assisted_case_observer_matrix = pd.read_csv('./prostate_assisted.csv')
-assisted_case_observer_matrix.head(15)
-observers = list(assisted_case_observer_matrix.columns)
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument("case_observers", metavar="data", help="Path for data to run analysis on", nargs="+", type=pd.read_csv)
+parser.add_argument("-m", "--model", help="""Model for analysis:
+    onest: Observers Needed to Evaluate a Subjective Test,
+    ga: Generalized Accuracy -- future,
+    esi: Error Severity Index -- future""", 
+    dest="model", 
+    choices=[
+        "onest",
+        "ga",
+        "esi"
+    ], required=True)
+parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model", dest="fractional", action="store_true")
+parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
+parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
 
-unassisted_case_observer_matrix = pd.read_csv('./prostate_unassisted.csv')
-unassisted_case_observer_matrix.head(15)
+args = parser.parse_args()
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here: 
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
-# observers = ['A', 'B', 'C', 'D', 'E']
-# values =    ['0', '2', '2', '3', '1']
-# case = pd.Series(data=values, index=observers)
 def match(case, observers, fractional=False):
     '''
     Check if all observers of case match.
@@ -49,28 +55,21 @@ def match(case, observers, fractional=False):
                 return 0
 
         return 1
-
-        # Alternative (probably fater) method if we have MANY observers, just less readable
-        # a = case[observers].to_numpy()
-        # return 1 if (a[0] == a).all() else 0
     
     else:
         return case[observers].value_counts().max() / len(observers)
 
 
-def overall_proportion_agreement(case_observer_matrix, observers):
+def overall_proportion_agreement(case_observer_matrix, *args):
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
     '''
-    case_agreements = case_observer_matrix.apply(match, args=(observers, False), axis=1)
+    case_agreements = case_observer_matrix.apply(match, args=args, axis=1)
     # number of full row-matches / number of cases
     return case_agreements.sum() / len(case_observer_matrix.index)
 
-# observers = ['A', 'B', 'C', 'D', 'G', 'H']
-# print(overall_proportion_agreement(case_observer_matrix, observers))
 
-
-def onest(case_observer_matrix, unique_curves, O_max):
+def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
     '''
     onest takes in the (case X observer m) matrix and the desired number of iterations C, and returns a C x O_m-1 matrix of OPAs
     [
@@ -91,78 +90,67 @@ def onest(case_observer_matrix, unique_curves, O_max):
     all_observers = list(case_observer_matrix.columns)
 
     for new_curve in range(unique_curves):
+        print("Running curve: ", new_curve)
         random.shuffle(all_observers)
         observers_for_this_curve = all_observers[:O_max]
         # Reshuffle observers until we get something new
         while observers_for_this_curve in observer_lists:
             random.shuffle(all_observers)
-            observers_for_this_curve = observers[:O_max]
+            observers_for_this_curve = all_observers[:O_max]
 
         observer_lists.append(observers_for_this_curve.copy())
        
         curve = []
 
         for index in range(2, len(observers_for_this_curve)):
-            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
+            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
 
     return onest
+
+if args.model == "onest":
+    # Convert case_observer matrices to OPAs
+    data_df = []
+    for case_observer_matrix in args.case_observers:
+        # ? How should we structure the call for unique_curves and O_max to be obvious and versatile
+        # Ideas:
+        # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
+        # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
+        # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
+
+        unique_curves = 100
+        o_max = len(case_observer_matrix.columns)
+        df = onest(case_observer_matrix, unique_curves, o_max, args.fractional)
+        if args.describe:
+            # Desribe as mean, min, max if desired
+            df = df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+
+        data_df.append(df)
+
     
-onest_assisted_df = onest(assisted_case_observer_matrix, 100, 20)
-onest_unassisted_df = onest(unassisted_case_observer_matrix, 100, 20)
+    opas = data_df[0].plot.line(
+        style="-" if args.describe else "o-", 
+        color=args.colors[0], 
+        legend=False, 
+        fillstyle="none", 
+        linewidth=1 if args.describe else .5
+    )
+    counter = 0
+    for data in data_df[1:]:
+        counter += 1
+        data.plot.line(
+            style="-" if args.describe else "o-", 
+            color=args.colors[counter % len(data_df)], 
+            legend=False, 
+            fillstyle="none", 
+            linewidth=1 if args.describe else .5,
+            ax=opas
+        )
 
-assisted_description = onest_assisted_df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
-pprint(assisted_description)
-unassisted_description = onest_unassisted_df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
-pprint(unassisted_description)
+    opas.xaxis.set_major_locator(MultipleLocator(6))
+    opas.xaxis.set_major_formatter('{x:.0f}')
+    opas.set_xlim([data_df[0].index[0], data_df[0].index[-1]])
+    opas.set_ylim([0, 1])
 
-pprint(onest_assisted_df)   
-pprint(onest_unassisted_df)  
-
-all_OPAs = onest_assisted_df.plot.line(
-    style="o-", 
-    color="#B10202", 
-    legend=False, 
-    fillstyle="none", 
-    linewidth=.5
-)
-onest_unassisted_df.plot.line(
-    style="o-", 
-    color="#008000", 
-    legend=False, 
-    fillstyle="none", 
-    linewidth=.5, 
-    ax=all_OPAs
-)
-
-pprint(assisted_description)
-envelope_OPAs = assisted_description.plot.line(
-    style="-", 
-    color="#B10202", 
-    legend=False, 
-    fillstyle="none", 
-    linewidth=1
-)
-unassisted_description.plot.line(
-    style="-", 
-    color="#008000", 
-    legend=False, 
-    fillstyle="none", 
-    linewidth=1,
-    ax=envelope_OPAs
-)
-
-
-
-all_OPAs.xaxis.set_major_locator(MultipleLocator(6))
-all_OPAs.xaxis.set_major_formatter('{x:.0f}')
-all_OPAs.set_xlim([onest_assisted_df.index[0], onest_assisted_df.index[-1]])
-all_OPAs.set_ylim([0, 1])
-
-envelope_OPAs.xaxis.set_major_locator(MultipleLocator(6))
-envelope_OPAs.xaxis.set_major_formatter('{x:.0f}')
-envelope_OPAs.set_xlim([assisted_description.index[0], assisted_description.index[-1]])
-envelope_OPAs.set_ylim([0, 1])
-
-plt.show()
+    plt.show()
