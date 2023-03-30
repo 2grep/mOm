@@ -49,7 +49,7 @@ def data_reader(file_name):
     fname, fext = os.path.splitext(file_name)
     file_names.append(fname)
 
-    print(fname, fext)
+    print("Name:", fname, "Ext:", fext)
     if fext == ".pkl":
         datasets_from_cache = True
         return pd.read_pickle(file_name)
@@ -57,7 +57,9 @@ def data_reader(file_name):
         datasets_from_cache = True
         return np.load(file_name)
     else:
-        return pd.read_csv(file_name)
+        data = pd.read_csv(file_name)
+        print(data)
+        return data
 
 
 args.datasets = [data_reader(set) for set in args.dataset_names]
@@ -81,13 +83,14 @@ def match(case, observers, fractional=False):
             # if the observations are different
             if case[observer] != first:
                 return 0
-
+            
         return 1
 
     else:
         return case[observers].value_counts().max() / len(observers)
     
-def random_unique_permutations(array, max_choices=-1):
+def random_unique_permutations(array, max_choices=-2):
+        max_choices += 1
         prev_permutations = []
         while True:
             random.shuffle(array)
@@ -114,43 +117,62 @@ def overall_proportion_agreement(case_observer_matrix, *args):
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
     '''
+    # Check for matches across rows
     case_agreements = case_observer_matrix.apply(match, args=args, axis=1)
     # number of full row-matches / number of cases
     return case_agreements.sum() / len(case_observer_matrix.index)
 
 
 def cases_x_onest(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers, fractional=False):
-    max_num_cases += 1
-    max_num_observers += 1
-
+    # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
     all_cases = list(case_observer_matrix.index)
-    observers_generator = random_unique_permutations(
-        all_observers, max_num_observers)
+    observers_generator = random_unique_permutations(all_observers, max_num_observers)
     cases_generator = random_unique_permutations(all_cases, max_num_cases)
 
     space = []
 
+    # case_reduction_time = 0
+    # observer_reduction_time = 0
+    opa_calculation_time = 0
+
     for new_surface in np.arange(num_unique_surfaces):
-        print("Running surface: ", new_surface)
+        print("Running surface:", new_surface)
         surface_cases = next(cases_generator)
         surface_observers = next(observers_generator)
 
-        grid = []
+        # cases x observers
+        opa_grid = []
 
-        for cumulative_case_index in range(1, len(surface_cases)):
-            column = []
+        for cumulative_case_index in range(1, len(surface_cases) + 1):
+            print("Running case:", str(new_surface) + "." + str(cumulative_case_index))
+            observer_opas = []
 
             for cumulative_observer_index in range(2, len(surface_observers)):
+                # I don't know why, but using `iloc` instead of `loc` makes matching an order of magnitude faster
+                reduced_cases = case_observer_matrix.iloc[surface_cases[:cumulative_case_index]]
+                reduced_observers = surface_observers[:cumulative_observer_index]
+                # print(surface_cases[:cumulative_case_index])
+                # print(reduced_observers)
 
-                column.append(overall_proportion_agreement(
-                    case_observer_matrix.loc[surface_cases[:cumulative_case_index]],
-                    surface_observers[:cumulative_observer_index],
-                    fractional))
+                start = time.time()
+                opa = overall_proportion_agreement(
+                    reduced_cases,
+                    reduced_observers,
+                    fractional)
+                end = time.time()
+                opa_calculation_time += end - start
 
-            grid.append(column)
+                observer_opas.append(opa)
 
-        space.append(grid)
+            # print(observer_opas)
+            opa_grid.append(observer_opas)
+
+        space.append(opa_grid)
+
+    # print("Case reduction time:", case_reduction_time)
+    # print("Observer reduction time:", observer_reduction_time)
+    print("OPA calculation time:", opa_calculation_time)
 
     return space
 
@@ -278,11 +300,11 @@ elif args.model == "onest_cummulative":
     # observers_max = args.datasets[0].index[-1]
     observers_min = 2
     observers_max = 20
-    observers_axis = np.arange(observers_min, observers_max)
+    observers_axis = np.arange(observers_min, observers_max + 1)
     cases_min = 1
     # cases_max = len(args.datasets[0].columns)
     cases_max = 240
-    cases_axis = np.arange(cases_min, cases_max)
+    cases_axis = np.arange(cases_min, cases_max + 1)
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
 
     # Run ONEST with O observers and C cases (for each cell in [observers_axis x cases_axis])
@@ -291,9 +313,10 @@ elif args.model == "onest_cummulative":
     counter = 0
     if not datasets_from_cache:
         for cases_x_observers_matrix in args.datasets:
-            unique_surfaces = 1
-            max_num_observers = len(cases_x_observers_matrix.columns)
+            # Get case x observer bounds
+            unique_surfaces = 10000
             max_num_cases = len(cases_x_observers_matrix.index)
+            max_num_observers = len(cases_x_observers_matrix.columns)
 
             single_analysis = cases_x_onest(
                 cases_x_observers_matrix, unique_surfaces, max_num_cases, max_num_observers, args.fractional)
@@ -304,15 +327,38 @@ elif args.model == "onest_cummulative":
                 np.save(file_names[counter], np.asarray(single_analysis))
                 counter += 1
 
-        case_onest_analysis = np.asarray(case_onest_analyses)
+        # case_onest_analyes = ndarry
+        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
+        #                    = (datasets, surfaces, cases, observers - 1)
+        case_onest_analyses = np.asarray(case_onest_analyses)
 
     else:
+        # case_onest_analyes = list of ndarrys
+        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
+        #                    = (datasets, surfaces, cases, observers - 1)
         case_onest_analyses = args.datasets
 
-    print(case_onest_analyses[0][0])
-    # Plot the surface.
-    surf = ax.plot_surface(observers_axis, cases_axis, case_onest_analyses[0][0], cmap=cm.coolwarm,
-                           linewidth=0, antialiased=False)
+    if args.describe:
+        # Get min and max
+        dataset_surfaces = []
+        for dataset in case_onest_analyses:
+            dataset_surfaces.append([
+                np.amax(dataset, axis=0), 
+                np.amin(dataset, axis=0)]
+            )
+        dataset_surfaces = np.asarray(dataset_surfaces)
+    
+    else:
+        dataset_surfaces = np.asarray(case_onest_analyses)
+
+    # Plot the surface
+    surfs = []
+    colors = ["coolwarm", "PiYG"]
+    print(dataset_surfaces.shape)
+    for dataset in np.arange(dataset_surfaces.shape[0]):
+        for surface in dataset_surfaces[dataset]:
+            surf = ax.plot_surface(observers_axis, cases_axis, surface, cmap=colors[dataset % len(colors)],
+                                linewidth=0, antialiased=False)
 
     # Customize the z axis.
     ax.xaxis.set_major_locator(MultipleLocator(6))
