@@ -78,14 +78,14 @@ def match(case, observers, fractional=False):
     else:
         return case[observers].value_counts().max() / len(observers)
     
-def random_unique_permutations(array, num):
+def random_unique_permutations(array, max_choices=-1):
         prev_permutations = []
-        for _ in np.arange(num):
+        while True:
             random.shuffle(array)
-            new_permutation = array[:num]
+            new_permutation = array[:max_choices]
             while new_permutation in prev_permutations:
                 random.shuffle(array)
-                new_permutation = array[:num]
+                new_permutation = array[:max_choices]
 
             yield new_permutation
 
@@ -116,10 +116,10 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
 
     onest = pd.DataFrame()
     all_observers = list(case_observer_matrix.columns)
-    observers_generator = random_unique_permutations(all_observers)
+    observers_generator = random_unique_permutations(all_observers, O_max)
     
-    permutations_time_aggregate = 0
-    onest_calculations_time_aggregate = 0
+    # permutations_time_aggregate = 0
+    # onest_calculations_time_aggregate = 0
 
     for new_curve in range(unique_curves):
         print("Running curve: ", new_curve)
@@ -141,8 +141,8 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
     
-    print(f"Time to generate {O_max} random unique permutations of observsers: ", permutations_time_aggregate)
-    print(f"Time to calculate {O_max} ONEST curves: ", onest_calculations_time_aggregate)
+    # print(f"Time to generate {O_max} random unique permutations of observsers: ", permutations_time_aggregate)
+    # print(f"Time to calculate {O_max} ONEST curves: ", onest_calculations_time_aggregate)
 
     return onest
 
@@ -224,7 +224,8 @@ elif args.model == "onest_cummulative":
     cases_axis = np.arange(cases_min, cases_max)
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
 
-    # Run ONEST with O observers and C cases (for each )
+    # Run ONEST with O observers and C cases (for each cell in [observers_axis x cases_axis])
+    
 
     proportion_agreement_axis = observers_axis
 
