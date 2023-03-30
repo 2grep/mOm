@@ -1,9 +1,12 @@
 #!usr/bin/env python3
 import argparse
+import os
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+from matplotlib import cm
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, LinearLocator)
 import random as random
 from pprint import pprint
 
@@ -18,7 +21,7 @@ from pprint import pprint
 # TODO!: add in ga and esi support
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument("case_observers", metavar="data", help="Path for data to run analysis on", nargs="+", type=pd.read_csv)
+parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
 parser.add_argument("-m", "--model", help="""Model for analysis:
     onest: Observers Needed to Evaluate a Subjective Test,
     ga: Generalized Accuracy -- future,
@@ -32,8 +35,24 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
 parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model", dest="fractional", action="store_true")
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
 parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
+parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
+parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
 
 args = parser.parse_args()
+
+datasets_from_cache = [False]
+file_names = []
+def data_reader(file_name):
+    fname, fext = os.path.splitext(file_name)
+    file_names.append(fname)
+         
+    if fext == ".pkl":
+        datasets_from_cache = True
+        return pd.read_pickle(file_name)
+    else:
+        return pd.read_csv(file_name)
+
+args.datasets = [data_reader(set) for set in args.dataset_names]
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here: 
@@ -88,69 +107,139 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
     onest = pd.DataFrame()
     observer_lists = []
     all_observers = list(case_observer_matrix.columns)
+    
+    permutations_time_aggregate = 0
+    onest_calculations_time_aggregate = 0
 
     for new_curve in range(unique_curves):
         print("Running curve: ", new_curve)
+        start = time.time()
+
+        ## Get the unique random permutaion of observers
         random.shuffle(all_observers)
         observers_for_this_curve = all_observers[:O_max]
         # Reshuffle observers until we get something new
         while observers_for_this_curve in observer_lists:
             random.shuffle(all_observers)
             observers_for_this_curve = all_observers[:O_max]
+        
+        end = time.time()
+
+        permutations_time_aggregate += end - start
+
+
+        start = time.time()
 
         observer_lists.append(observers_for_this_curve.copy())
        
+        ## Generate single onest curve
         curve = []
-
         for index in range(2, len(observers_for_this_curve)):
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
 
+        end = time.time()
+
+        onest_calculations_time_aggregate += end - start
+
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
+    
+    print(f"Time to generate {O_max} random unique permutations of observsers: ", permutations_time_aggregate)
+    print(f"Time to calculate {O_max} ONEST curves: ", onest_calculations_time_aggregate)
 
     return onest
 
 if args.model == "onest":
-    # Convert case_observer matrices to OPAs
-    data_df = []
-    for case_observer_matrix in args.case_observers:
-        # ? How should we structure the call for unique_curves and O_max to be obvious and versatile
-        # Ideas:
-        # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
-        # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
-        # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
+    ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
+    dataset_onest_analyses = []
+    if not datasets_from_cache:
+        counter = 0
+        for cases_x_observers_matrix in args.datasets:
+            # ? How should we structure the call for unique_curves and O_max to be obvious and versatile
+            # Ideas:
+            # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
+            # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
+            # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
+            unique_curves = 100
+            o_max = len(cases_x_observers_matrix.columns)
+            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max, args.fractional)
+            if args.describe:
+                # Desribe as mean, min, max if desired
+                cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
 
-        unique_curves = 100
-        o_max = len(case_observer_matrix.columns)
-        df = onest(case_observer_matrix, unique_curves, o_max, args.fractional)
-        if args.describe:
-            # Desribe as mean, min, max if desired
-            df = df.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+            dataset_onest_analyses.append(cases_x_observers_onest_analysis)
 
-        data_df.append(df)
-
+            if args.cache:
+                # TODO: Need to encode certain information in args such as if -d is flagged
+                cases_x_observers_onest_analysis.to_pickle(file_names[counter] + ".pkl")
+                counter += 1
     
-    opas = data_df[0].plot.line(
+    else:
+        dataset_onest_analyses = args.datasets
+
+    ## Plot each analysis
+    fig, ax = plt.subplots()
+    plots = [dataset_onest_analyses[0].plot.line(
         style="-" if args.describe else "o-", 
         color=args.colors[0], 
-        legend=False, 
-        fillstyle="none", 
-        linewidth=1 if args.describe else .5
-    )
+        # legend=False, 
+        label="Label 1",
+        fillstyle="none",
+        linewidth=1 if args.describe else .5,
+        ax=ax
+    )]
     counter = 0
-    for data in data_df[1:]:
+    for data in dataset_onest_analyses[1:]:
         counter += 1
-        data.plot.line(
-            style="-" if args.describe else "o-", 
-            color=args.colors[counter % len(data_df)], 
-            legend=False, 
-            fillstyle="none", 
-            linewidth=1 if args.describe else .5,
-            ax=opas
+        plots.append(
+            data.plot.line(
+                        style="-" if args.describe else "o-", 
+                        color=args.colors[counter % len(args.colors)], 
+                        # legend=False, 
+                        fillstyle="none", 
+                        linewidth=1 if args.describe else .5,
+                        ax=ax
+                    )
         )
 
-    opas.xaxis.set_major_locator(MultipleLocator(6))
-    opas.xaxis.set_major_formatter('{x:.0f}')
-    opas.set_xlim([data_df[0].index[0], data_df[0].index[-1]])
-    opas.set_ylim([0, 1])
+    # adjust plot parameters
+    ax.xaxis.set_major_locator(MultipleLocator(6))
+    ax.xaxis.set_major_formatter('{x:.0f}')
+    ax.set_xlim([dataset_onest_analyses[0].index[0], dataset_onest_analyses[0].index[-1]])
+    ax.set_xlabel("Number of Observers")
+    ax.set_ylim([0, 1])
+    ax.set_ylabel("Overall Proportion Agreement")
+    ax.legend(ax.get_lines()[::3], args.labels if args.labels != None else file_names)
 
+    plt.show()
+
+elif args.model == "onest_cummulative":
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
+    # Make data.
+
+    observers_min = args.datasets[0].index[0]
+    observers_max = args.datasets[0].index[-1]
+    observers_axis = np.arange(observers_min, observers_max)
+    cases_min = args.datasets[0].columns[0]
+    cases_max = args.datasets[0].columns[-1]
+    cases_axis = np.arange(cases_min, cases_max)
+    observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
+
+    # Run ONEST with O observers and C cases (for each )
+
+    proportion_agreement_axis = observers_axis
+
+    # Plot the surface.
+    surf = ax.plot_surface(observers_axis, cases_axis, proportion_agreement_axis, cmap=cm.coolwarm,
+                        linewidth=0, antialiased=False)
+
+    # Customize the z axis.
+    ax.set_zlim(-1.01, 1.01)
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    # A StrMethodFormatter is used automatically
+    ax.zaxis.set_major_formatter('{x:.02f}')
+
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+ 
     plt.show()

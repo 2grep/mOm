@@ -41,6 +41,21 @@ def generalized_accuracy(conf_matrix, weights):
 
     return score / num_elements
 
+def error_severity_index(conf_matrix, esi_weights):
+    '''
+    Error severity index takes in a confusion matrix and returns a measure of the overall predictive value of a given classifier. TODO: check that the conf_matrix is of the same shape as the esi_weights
+    '''
+    score = 0
+    num_elements = sum([sum(r) for r in conf_matrix])
+    if num_elements == 0:
+      raise("No elements")
+      
+    for i, row in enumerate(conf_matrix):
+        for j, x in enumerate(row):
+            score += x * esi_weights[j][i]
+
+    return score / num_elements
+
 def generalized_recall(conf_matrix, weights, label_num):
     '''
     Generalized recall is computed for a specific label. For a given label, it computes a measure of all the label's actual instances which were corretly labelled.
@@ -56,7 +71,7 @@ def generalized_recall(conf_matrix, weights, label_num):
         score += x * weights[label_num][i]
 
         # to print out the work
-        show_work += ("{} * {:.2f}").format(x, weights[i][label_num])
+        show_work += ("{}⋅{:.2f}").format(x, weights[i][label_num])
         if i != len(col) - 1:
             show_work += (" + ")
         else:
@@ -84,7 +99,7 @@ def generalized_precision(conf_matrix, weights, label_num):
         score += x * weights[label_num][i]
 
         # to print out the work
-        show_work += ("{} * {:.2f}").format(x, weights[label_num][i])
+        show_work += ("{}⋅{:.2f}").format(x, weights[label_num][i])
         if i != len(row) - 1:
             show_work += (" + ")
         else:
@@ -117,11 +132,11 @@ weights_sym_steep = [[1.0,0.9,0.1,0.0,0.0],
                      [0.0,0.1,0.9,1.0,0.9], 
                      [0.0,0.0,0.1,0.9,1.0]]
 
-weights_manual = [[1.0,0.9,0.2,0.1,0.1], 
-                  [0.9,1.0,0.9,0.2,0.2], 
-                  [0.2,0.5,1.0,0.9,0.2], 
-                  [0.0,0.1,0.9,1.0,0.9], 
-                  [0.0,0.1,0.2,0.9,1.0]]
+esi_weights = [[0,1,3,5,5], 
+               [0,0,1,3,5], 
+               [1,0,0,1,3], 
+               [2,1,0,0,1], 
+               [2,2,1,0,0]]
 
 ## MAIN: CALCULATE THE FIGURES OF MERIT ##
 # Confusion matrix follows the convention here
@@ -144,4 +159,5 @@ for i in range(num_classes):
   generalized_precision(conf_matrix, weights, i)
   print("Gen. Recall for label", i)
   generalized_recall(conf_matrix, weights, i)
-  print("Overall Gen. Accuracy:", generalized_accuracy(conf_matrix, weights))
+print("Overall Gen. Accuracy:", generalized_accuracy(conf_matrix, weights))
+print("Error severity index:", error_severity_index(conf_matrix, esi_weights))
