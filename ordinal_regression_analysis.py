@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 ## BUILD CONFUSION MATRIX ##
 # The main return uses the confusion matrix conf_matrix, however, there are
