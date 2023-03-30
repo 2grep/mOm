@@ -6,8 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.ticker import (
-    MultipleLocator, AutoMinorLocator, LinearLocator)
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, LinearLocator)
 import random as random
 from pprint import pprint
 
@@ -22,29 +21,23 @@ from pprint import pprint
 # TODO!: add in ga and esi support
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument("dataset_names", metavar="data",
-                    help="Path for data to run analysis on", nargs="+")
+parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
 parser.add_argument("-m", "--model", help="""Model for analysis:
     onest: Observers Needed to Evaluate a Subjective Test,
     ga: Generalized Accuracy -- future,
-    esi: Error Severity Index -- future""",
-                    dest="model",
-                    choices=[
-                        "onest",
-                        "onest_cummulative",
-                        "ga",
-                        "esi"
-                    ], required=True)
-parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model",
-                    dest="fractional", action="store_true")
-parser.add_argument("-d", "--statistical_analysis",
-                    help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
-parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files",
-                    dest="colors", nargs="+", default=["tab:gray"])
-parser.add_argument(
-    "-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
-parser.add_argument("--cache", help="If flagged, caches data after processing",
-                    dest="cache", action="store_true")
+    esi: Error Severity Index -- future""", 
+    dest="model", 
+    choices=[
+        "onest",
+        "onest_cummulative",
+        "ga",
+        "esi"
+    ], required=True)
+parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model", dest="fractional", action="store_true")
+parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
+parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
+parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
+parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
 
 args = parser.parse_args()
 
@@ -93,7 +86,17 @@ def match(case, observers, fractional=False):
 
     else:
         return case[observers].value_counts().max() / len(observers)
+    
+def random_unique_permutations(array, max_choices=-1):
+        prev_permutations = []
+        while True:
+            random.shuffle(array)
+            new_permutation = array[:max_choices]
+            while new_permutation in prev_permutations:
+                random.shuffle(array)
+                new_permutation = array[:max_choices]
 
+            yield new_permutation
 
 def random_unique_permutations(array, max_choices=-1):
     prev_permutations = []
@@ -171,7 +174,6 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
     onest = pd.DataFrame()
     all_observers = list(case_observer_matrix.columns)
     observers_generator = random_unique_permutations(all_observers, O_max)
-
     # permutations_time_aggregate = 0
     # onest_calculations_time_aggregate = 0
 
@@ -189,14 +191,12 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
         # start = time.time()
         curve = []
         for index in range(2, len(observers_for_this_curve)):
-            curve.append(overall_proportion_agreement(
-                case_observer_matrix, observers_for_this_curve[:index], fractional))
+            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
         # end = time.time()
         # onest_calculations_time_aggregate += end - start
 
-        onest = pd.concat([onest, pd.Series(curve, index=range(
-            2, len(curve) + 2))], ignore_index=False, axis=1)
-
+        onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
+    
     # print(f"Time to generate {O_max} random unique permutations of observsers: ", permutations_time_aggregate)
     # print(f"Time to calculate {O_max} ONEST curves: ", onest_calculations_time_aggregate)
 
@@ -216,30 +216,27 @@ if args.model == "onest":
             # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
             unique_curves = 100
             o_max = len(cases_x_observers_matrix.columns)
-            cases_x_observers_onest_analysis = onest(
-                cases_x_observers_matrix, unique_curves, o_max, args.fractional)
+            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max, args.fractional)
             if args.describe:
                 # Desribe as mean, min, max if desired
-                cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(
-                    pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+                cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
 
             dataset_onest_analyses.append(cases_x_observers_onest_analysis)
 
             if args.cache:
                 # TODO: Need to encode certain information in args such as if -d is flagged
-                cases_x_observers_onest_analysis.to_pickle(
-                    file_names[counter] + ".pkl")
+                cases_x_observers_onest_analysis.to_pickle(file_names[counter] + ".pkl")
                 counter += 1
-
+    
     else:
         dataset_onest_analyses = args.datasets
 
     ## Plot each analysis
     fig, ax = plt.subplots()
     plots = [dataset_onest_analyses[0].plot.line(
-        style="-" if args.describe else "o-",
-        color=args.colors[0],
-        # legend=False,
+        style="-" if args.describe else "o-", 
+        color=args.colors[0], 
+        # legend=False, 
         label="Label 1",
         fillstyle="none",
         linewidth=1 if args.describe else .5,
@@ -270,7 +267,7 @@ if args.model == "onest":
     ax.legend(ax.get_lines()[::3],
               args.labels if args.labels != None else file_names)
 
-    # plt.show()
+    plt.show()
 
 elif args.model == "onest_cummulative":
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -332,6 +329,6 @@ elif args.model == "onest_cummulative":
     ax.zaxis.set_major_formatter('{x:.02f}')
 
     # Add a color bar which maps values to colors.
-    fig.colorbar(surf, shrink=0.5, aspect=5)
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
 
     plt.show()
