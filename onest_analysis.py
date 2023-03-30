@@ -77,7 +77,17 @@ def match(case, observers, fractional=False):
     
     else:
         return case[observers].value_counts().max() / len(observers)
+    
+def random_unique_permutations(array, num):
+        prev_permutations = []
+        for _ in np.arange(num):
+            random.shuffle(array)
+            new_permutation = array[:num]
+            while new_permutation in prev_permutations:
+                random.shuffle(array)
+                new_permutation = array[:num]
 
+            yield new_permutation
 
 def overall_proportion_agreement(case_observer_matrix, *args):
     '''
@@ -105,41 +115,29 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
     O_max += 1
 
     onest = pd.DataFrame()
-    observer_lists = []
     all_observers = list(case_observer_matrix.columns)
+    observers_generator = random_unique_permutations(all_observers)
     
     permutations_time_aggregate = 0
     onest_calculations_time_aggregate = 0
 
     for new_curve in range(unique_curves):
         print("Running curve: ", new_curve)
-        start = time.time()
-
         ## Get the unique random permutaion of observers
-        random.shuffle(all_observers)
-        observers_for_this_curve = all_observers[:O_max]
-        # Reshuffle observers until we get something new
-        while observers_for_this_curve in observer_lists:
-            random.shuffle(all_observers)
-            observers_for_this_curve = all_observers[:O_max]
-        
-        end = time.time()
 
-        permutations_time_aggregate += end - start
+        # start = time.time()
+        observers_for_this_curve = next(observers_generator)
+        # end = time.time()
+        # permutations_time_aggregate += end - start
 
-
-        start = time.time()
-
-        observer_lists.append(observers_for_this_curve.copy())
-       
         ## Generate single onest curve
+
+        # start = time.time()
         curve = []
         for index in range(2, len(observers_for_this_curve)):
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
-
-        end = time.time()
-
-        onest_calculations_time_aggregate += end - start
+        # end = time.time()
+        # onest_calculations_time_aggregate += end - start
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
     
