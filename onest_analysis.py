@@ -40,7 +40,7 @@ parser.add_argument("--cache", help="If flagged, caches data after processing", 
 
 args = parser.parse_args()
 
-datasets_from_cache = [False]
+datasets_from_cache = False
 file_names = []
 def data_reader(file_name):
     fname, fext = os.path.splitext(file_name)
@@ -148,6 +148,7 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
 
     return onest
 
+
 if args.model == "onest":
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     dataset_onest_analyses = []
@@ -210,7 +211,7 @@ if args.model == "onest":
     ax.set_ylabel("Overall Proportion Agreement")
     ax.legend(ax.get_lines()[::3], args.labels if args.labels != None else file_names)
 
-    plt.show()
+    # plt.show()
 
 elif args.model == "onest_cummulative":
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
