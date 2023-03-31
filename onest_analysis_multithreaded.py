@@ -35,7 +35,7 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
     dest="model", 
     choices=[
         "onest",
-        "onest_cummulative",
+        "sarape",
         "ga",
         "esi"
     ], required=True)
@@ -139,7 +139,7 @@ def overall_proportion_agreement(case_observer_matrix, *args):
     return case_agreements.sum() / len(case_observer_matrix.index)
 
 
-def cases_x_onest(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers, fractional=False):
+def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers, fractional=False):
     # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
     all_cases = list(case_observer_matrix.index)
@@ -307,7 +307,7 @@ if args.model == "onest":
 
     plt.show()
 
-elif args.model == "onest_cummulative":
+elif args.model == "sarape":
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
     # observers_min = args.datasets[0].index[0]
@@ -333,7 +333,7 @@ elif args.model == "onest_cummulative":
             max_num_observers = len(cases_x_observers_matrix.columns)
 
             start = time.time()
-            single_analysis = cases_x_onest(
+            single_analysis = sarape(
                 cases_x_observers_matrix, unique_surfaces, max_num_cases, max_num_observers, args.fractional)
             end = time.time()
             print("ONEST calculation time:", end - start)
