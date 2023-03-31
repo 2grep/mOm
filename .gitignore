@@ -3,9 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Pickled files
-*.npy
-
 # C extensions
 *.so
 
@@ -100,6 +97,7 @@ ipython_config.py
 
 # data files
 *.pkl 
+*.npy
 *.xlsx
 *.csv
 *.numbers
