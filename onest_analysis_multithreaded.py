@@ -1,13 +1,20 @@
 #!usr/bin/env python3
 import argparse
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, LinearLocator)
-import numpy as np
 import os
-import pandas as pd
-from pprint import pprint
-import random as random
 import time
+import numpy as np
+import functools
+import itertools
+import operator
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, LinearLocator)
+import random as random
+from pprint import pprint
+
+import multiprocessing
+import concurrent.futures
 
 ## ARGUMENTS ##
 # TODO: convert unique_curves and o_max to inputted values
@@ -16,11 +23,11 @@ import time
 # 1 - print curve generation progress (preferably as loading bar)
 #       Progress: |█████████████████████████████████████████████-----| 90/100 Curve(s) Complete
 #       (https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020)
-# TODO: defeat entropy and make dev mode where it uses a pre-made set of obervers with each run rather than regenerating each time
 # TODO!: add in ga and esi support
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
+# TODO: should really call each model from seperate files for clarity
 parser.add_argument("-m", "--model", help="""Model for analysis:
     onest: Observers Needed to Evaluate a Subjective Test,
     ga: Generalized Accuracy -- future,
@@ -34,7 +41,6 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
     ], required=True)
 parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model", dest="fractional", action="store_true")
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
-# TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
 parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
 parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
 parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
@@ -86,6 +92,28 @@ def match(case, observers, fractional=False):
                 return 0
         return 1
 
+        ## NumPy match
+        # return int(np.all(case[observers] == case[observers[0]]))
+
+        ## functools match
+        # return functools.reduce(operator.eq, case[observers])
+
+        ## itertools match
+        # g = itertools.groupby(case[observers])
+        # return next(g, True) and not next(g, False)
+
+        ## all(first == x)
+        # iterator = iter(case[observers])
+        # try:
+        #     first = next(iterator)
+        # except StopIteration:
+        #     return True
+        # return all(first == x for x in iterator)
+
+        ## set length
+        # return len(set(case[observers])) == 1
+
+
     else:
         return case[observers].value_counts().max() / len(observers)
     
@@ -120,42 +148,47 @@ def cases_x_onest(case_observer_matrix, num_unique_surfaces, max_num_cases, max_
 
     space = []
 
-    # case_reduction_time = 0
-    # observer_reduction_time = 0
-    opa_calculation_time = 0
-
-    for new_surface in np.arange(num_unique_surfaces):
-        print("Running surface:", new_surface)
-        surface_cases = next(cases_generator)
-        surface_observers = next(observers_generator)
-
+    def _generate_surface(surface_num, surface_cases, surface_observers, space):
         # cases x observers
         opa_grid = []
 
         for cumulative_case_index in range(1, len(surface_cases) + 1):
-            print("Running case:", str(new_surface) + "." + str(cumulative_case_index))
+            print("Running case:", str(surface_num) + "." + str(cumulative_case_index))
             observer_opas = []
 
             for cumulative_observer_index in range(2, len(surface_observers)):
-                # I don't know why, but using `iloc` instead of `loc` makes matching an order of magnitude faster
                 reduced_cases = case_observer_matrix.iloc[surface_cases[:cumulative_case_index]]
                 reduced_observers = surface_observers[:cumulative_observer_index]
 
-                start = time.time()
                 opa = overall_proportion_agreement(
                     reduced_cases,
                     reduced_observers,
                     fractional)
-                end = time.time()
-                opa_calculation_time += end - start
 
                 observer_opas.append(opa)
 
+            # print(observer_opas)
             opa_grid.append(observer_opas)
 
         space.append(opa_grid)
 
-    print("OPA calculation time:", opa_calculation_time)
+    threads = multiprocessing.cpu_count()
+    executor = concurrent.futures.ThreadPoolExecutor(threads)
+    futures = {}
+    for new_surface in np.arange(num_unique_surfaces):
+        print("Running surface:", new_surface)
+        surface_cases = next(cases_generator)
+        surface_observers = next(observers_generator)
+        
+        futures[executor.submit(
+            _generate_surface,
+            new_surface,
+            surface_cases,
+            surface_observers,
+            space
+        )] = new_surface
+    
+    executor.shutdown()
 
     return space
 
@@ -179,19 +212,32 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
     onest = pd.DataFrame()
     all_observers = list(case_observer_matrix.columns)
     observers_generator = random_unique_permutations(all_observers, O_max)
+    # permutations_time_aggregate = 0
+    # onest_calculations_time_aggregate = 0
 
     for new_curve in range(unique_curves):
         print("Running curve: ", new_curve)
         ## Get the unique random permutaion of observers
+
+        # start = time.time()
         observers_for_this_curve = next(observers_generator)
+        # end = time.time()
+        # permutations_time_aggregate += end - start
 
         ## Generate single onest curve
+
+        # start = time.time()
         curve = []
         for index in range(2, len(observers_for_this_curve)):
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
+        # end = time.time()
+        # onest_calculations_time_aggregate += end - start
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
     
+    # print(f"Time to generate {O_max} random unique permutations of observsers: ", permutations_time_aggregate)
+    # print(f"Time to calculate {O_max} ONEST curves: ", onest_calculations_time_aggregate)
+
     return onest
 
 
@@ -262,12 +308,7 @@ if args.model == "onest":
     plt.show()
 
 elif args.model == "onest_cummulative":
-    # TODO: adjust this to work with both cached and uncached data
-    # Options:
-    # - Tensorflow tensors; no labels and seems a little overkill but definitely solid
-    # - Xarray; basically N-dimensional extension of pandas but seperate package
-    # - Pandas MultiIndexes (https://stackoverflow.com/a/36760901/16755079); full consistency in pandas but a bit to juggle levels (need `xs()`)
-    # - NumPy ndarray (aka. just go all in on numpy); more overhead in flipping around the data but full consistency
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
     # observers_min = args.datasets[0].index[0]
     # observers_max = args.datasets[0].index[-1]
@@ -327,11 +368,8 @@ elif args.model == "onest_cummulative":
     else:
         dataset_surfaces = np.asarray(case_onest_analyses)
 
-    # Could try MayaVi for less glitchy plots (https://stackoverflow.com/a/43004221)
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
     # Plot the surface
     surfs = []
-    # TODO: make these colors available in -c argument
     colors = ["coolwarm", "PiYG"]
     print(dataset_surfaces.shape)
     for dataset in np.arange(dataset_surfaces.shape[0]):
