@@ -196,6 +196,7 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
 
 
 if args.model == "onest":
+    unique_curves = 100
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     dataset_onest_analyses = []
     if not datasets_from_cache:
@@ -206,7 +207,6 @@ if args.model == "onest":
             # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
             # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
             # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
-            unique_curves = 100
             o_max = len(cases_x_observers_matrix.columns)
             cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max, args.fractional)
             if args.describe:
@@ -256,7 +256,7 @@ if args.model == "onest":
     ax.set_xlabel("Number of Observers")
     ax.set_ylim([0, 1])
     ax.set_ylabel("Overall Proportion Agreement")
-    ax.legend(ax.get_lines()[::3],
+    ax.legend(ax.get_lines()[::(3 if args.describe else unique_curves)],
               args.labels if args.labels != None else file_names)
 
     plt.show()
