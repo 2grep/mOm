@@ -150,11 +150,8 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
                 opa_calculation_time += end - start
 
                 observer_opas.append(opa)
-
             opa_grid.append(observer_opas)
-
         space.append(opa_grid)
-
     print("OPA calculation time:", opa_calculation_time)
 
     return space
@@ -188,10 +185,10 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
         ## Generate single onest curve
         curve = []
         for index in range(2, len(observers_for_this_curve)):
+            # num of observers x OPA point on the ONEST curve
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
-    
     return onest
 
 
