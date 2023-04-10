@@ -11,29 +11,11 @@ import random as random
 import time
 import lib
 
-
-file_names = []
-
-dataset_names = ["assisted.npy", "unassisted.npy"]
-# (datasets, cases, observers - 1, unique surfaces)
-datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
-
-# Splitting along observers and OPAs 
-# (e.g. 6, 12, & 18 observers x .33, .66, & .99 OPAs -> 
-#       6 observers for min/max + .33 OPA stats + .66 OPA stats + .99 OPA stats ...)
-
-observer_slices = 3
-opa_slices = 3
-
-colors = ["red", "green"]
-color = colors[0]
-fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
-
-dataset = datasets[0]
-
-
 # Max/min of observer slice
 def obs_range(dataset, observer_slices):
+    '''
+    Calculate mins and maxs of dataset.
+    '''
     # max number of observers / number of slices
     obs_step = dataset.shape[0] // observer_slices
     mins = np.amin(dataset[obs_step::obs_step], axis=2)
@@ -41,6 +23,9 @@ def obs_range(dataset, observer_slices):
     return np.dstack((mins, maxs))
 
 def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
+    '''
+    Calculate statistics (means and standard deviations) of dataset.
+    '''
     # max number of observers / number of slices
     obs_step = dataset.shape[0] // observer_slices
     # max number of buckets / number of slices
@@ -51,7 +36,7 @@ def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
     std_devs = np.std(bucketed, axis=1)
     return np.dstack((means, std_devs))
 
-def run_dataset(dataset, axs, observer_slices=3, opa_slices=3):
+def run_dataset(dataset, axs, observer_slices=3, opa_slices=3, color="gray"):
     ranges = obs_range(dataset, observer_slices)
     stats = opa_stats(dataset, observer_slices, opa_slices)
 
@@ -72,7 +57,18 @@ def run_dataset(dataset, axs, observer_slices=3, opa_slices=3):
                 ), 
                 color=color)
 
-run_dataset(dataset, axs, observer_slices, opa_slices)
+
+dataset_names = ["assisted.npy", "unassisted.npy"]
+datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
+
+observer_slices = 3
+opa_slices = 3
+
+colors = ["red", "green"]
+fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
+
+for i in range(len(datasets)):
+    run_dataset(datasets[i], axs, observer_slices, opa_slices, color=colors[i])
 
 plt.show()
 
