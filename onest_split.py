@@ -9,87 +9,144 @@ from scipy.stats import norm
 from pprint import pprint
 import random as random
 import time
+import lib
 
 
 file_names = []
-def data_reader(file_name):
-    global datasets_from_cache
-    fname, fext = os.path.splitext(file_name)
-    file_names.append(fname)
-
-    print("Name:", fname, "Ext:", fext)
-    if fext == ".pkl":
-        datasets_from_cache = True
-        return pd.read_pickle(file_name)
-    elif fext == ".npy":
-        datasets_from_cache = True
-        return np.load(file_name)
-    else:
-        data = pd.read_csv(file_name)
-        print(data)
-        return data
 
 dataset_names = ["assisted.npy", "unassisted.npy"]
-datasets = [data_reader(set) for set in dataset_names]
+# (datasets, cases, observers - 1, unique surfaces)
+datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-dataset_surfaces = []
-observer_steps = 3
-total_number_of_observer_pairs = 19
-observer_step_size = total_number_of_observer_pairs // observer_steps
-for dataset in datasets:
-    for observer_num in range(observer_step_size, total_number_of_observer_pairs, observer_step_size):
-        dataset_surfaces.append(pd.DataFrame({
-            "max": np.amax(dataset[:, :, observer_num], axis=0),
-            "min": np.amin(dataset[:, :, observer_num], axis=0),
-            "mean": np.average(dataset[:, :, observer_num], axis=0),
-            "std": np.std(dataset[:, :, observer_num], axis=0),
-        }))
+# Splitting along observers and OPAs 
+# (e.g. 6, 12, & 18 observers x .33, .66, & .99 OPAs -> 
+#       6 observers for min/max + .33 OPA stats + .66 OPA stats + .99 OPA stats ...)
 
-# assisted_df = pd.DataFrame(dataset_surfaces[0,:,:, observer_step - 1]).T
-# unassisted_df = pd.DataFrame(dataset_surfaces[1,:,:, observer_step - 1]).T
+observer_slices = 3
+opa_slices = 3
 
+# Calculate step sizes
+max_observers = datasets[0].shape[0]
+max_cases = datasets[0].shape[1]
+
+obs_step = max_observers // observer_slices
+
+
+dataset = datasets[0]
+# Max/min of observer slice
+
+mins = np.amin(dataset[obs_step::obs_step], axis=2)
+maxs = np.amax(dataset[obs_step::obs_step], axis=2)
+ranges = np.dstack((mins, maxs))
+
+# For each , calculate mean and std deviation in cases for OPA of .33, .66, and .99
+max_buckets = 100
+bucket_step = 100 // opa_slices
+bucketed = lib.bucket(dataset, max_buckets)[obs_step::obs_step, :, bucket_step::bucket_step]
+means = np.average(bucketed, axis=1)
+std_devs = np.std(bucketed, axis=1)
+stats = np.dstack((means, std_devs))
+
+# Graphing! stats and ranges
 colors = ["red", "green"]
+color = colors[0]
+fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
 
-length = len(dataset_surfaces)
-observer_steps = length // len(datasets)
-case_steps = 3
-total_number_of_cases = 240
-case_step_size = total_number_of_cases // case_steps
-fig, axs = plt.subplots(nrows=observer_steps, ncols=(case_steps + 1), squeeze=False)
-for case_plot in range(observer_steps):
-    for dataset in range(0, length, observer_steps):
-        color = colors[dataset % len(colors)]
-        index = dataset + case_plot
-        dataset_surfaces[index]["max"].plot.line(
-            style="-",
-            color=color,
-            fillstyle="none",
-            linewidth=1,
-            ax=axs[case_plot][0]
-        )
-        dataset_surfaces[index]["min"].plot.line(
-            style="-",
-            color=color,
-            fillstyle="none",
-            linewidth=1,
-            ax=axs[case_plot][0]
-        )
-        axs[case_plot][0].set_ylim([0, 1])
-        x = np.arange(0, 1, .001)
-        axs[case_plot][1].plot(
-            x, 
-            norm.pdf(x, dataset_surfaces[index].loc[case_step_size, "mean"], dataset_surfaces[index].loc[case_step_size - 1, "std"]),
-            color=color)
+# Graph ranges
+xs = np.arange(0, max_cases)
+for row in range(observer_slices):
+    axs[row][0].plot(xs, ranges[row][:, 0], color=color)
+    axs[row][0].plot(xs, ranges[row][:, 1], color=color)
 
-        axs[case_plot][2].plot(
-            x, norm.pdf(x, dataset_surfaces[index].loc[case_step_size * 2, "mean"], dataset_surfaces[index].loc[case_step_size * 2 - 1, "std"]),
-            color=color)
-
-        axs[case_plot][3].plot(
-            x, 
-            norm.pdf(x, dataset_surfaces[index].loc[case_step_size * 3 - 1, "mean"], dataset_surfaces[index].loc[case_step_size * 3 - 1, "std"]),
-            color=color)
-
-
+    # # Graph stats
+    for opa_slice in range(opa_slices):
+        axs[row][opa_slice + 1].plot(xs, norm.pdf(xs, stats[row][opa_slice][0], stats[row][opa_slice][1]), color=color)
 
 plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# observer_steps = 3
+# total_number_of_observer_pairs = 19
+# observer_step_size = total_number_of_observer_pairs // observer_steps
+# case_steps = 3
+# total_number_of_cases = 240
+# case_step_size = total_number_of_cases // case_steps
+
+# # 3D list of DataFrames
+# # (row, column, dataset)
+# analyses = []
+# datasets_length = len(datasets)
+# for observer_num in range(observer_step_size, total_number_of_observer_pairs, observer_step_size):
+#     observer_row = []
+#     case_opa_cross_section_item = []
+#     for dataset_index in range(datasets_length):
+#         case_opa_cross_section_item.append(pd.DataFrame({
+#             "max": np.amax(datasets[dataset_index][:, :, observer_num], axis=0),
+#             "min": np.amin(datasets[dataset_index][:, :, observer_num], axis=0),
+#         }))
+#     observer_row.append(case_opa_cross_section_item)
+
+#     for case_num in range(case_step_size, total_number_of_cases, case_step_size):
+#         case_stats_item = []
+#         for dataset_index in range(datasets_length):
+#             print(datasets[dataset_index][:, :, observer_num].shape)
+#             case_stats_item.append(pd.DataFrame({
+#                 "mean": np.average(datasets[dataset_index][:, case_num, observer_num], axis=0),
+#                 "std": np.std(datasets[dataset_index][:, case_num, observer_num], axis=0)
+#             }))
+#         observer_row.append(case_stats_item)
+        
+#     analyses.append(observer_row)
+
+# colors = ["red", "green"]
+
+# fig, axs = plt.subplots(nrows=observer_steps, ncols=(case_steps + 1), squeeze=False)
+
+# # Graph cases x OPA for each slice
+
+# xrange = np.arange(0, 1, .001)
+# for row in range(len(analyses)):
+#     for dataset in range(datasets_length):
+#         color = colors[dataset % len(colors)]
+#         analyses[row][0][dataset]["max"].plot.line(
+#             style="-",
+#             color=color,
+#             fillstyle="none",
+#             linewidth=1,
+#             ax=axs[row][0]
+#         )
+#         analyses[row][0][dataset]["min"].plot.line(
+#             style="-",
+#             color=color,
+#             fillstyle="none",
+#             linewidth=1,
+#             ax=axs[row][0]
+#         )
+    
+#         for graph in range(case_steps):
+#             print(analyses[row][1+graph][dataset])
+
+#             axs[row][graph].plot(
+#                 xrange,
+#                 norm.pdf(xrange, analyses[row][1+graph][dataset].loc[case_step_size * (graph + 1), "mean"],
+#                          analyses[row][1+graph][dataset].loc[case_step_size * (graph + 1) - 1, "std"]),
+#                 color=color)
+
+# plt.show()
