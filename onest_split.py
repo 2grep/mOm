@@ -52,15 +52,25 @@ def run_dataset(dataset, axs, observer_slices=3, opa_slices=3, color="gray", met
         bins = np.arange(0, dataset.shape[1], 5)
         for row in range(observer_slices):
             # Graph ranges
-            axis_row = observer_slices - row - 1
-            axs[axis_row][0].plot(xs, ranges[row][:, 0], color=color)
-            axs[axis_row][0].plot(xs, ranges[row][:, 1], color=color)
+            # axis_row = observer_slices - row - 1
+            axis_row = row
+            axs[0][axis_row].plot(xs, ranges[row][:, 0], color=color)
+            axs[0][axis_row].plot(xs, ranges[row][:, 1], color=color)
 
             for opa_slice in range(opa_slices):
-                axs[axis_row][opa_slice + 1].hist(
+                axis_slice = opa_slices - opa_slice
+                axs[axis_slice][axis_row].hist(
                     xs, bins=bins, weights=hist[row, : , opa_slice], 
                     align="left", color=color, alpha=.5)
-                axs[axis_row][opa_slice + 1].set_ylim(0, 5000)
+                axs[axis_slice][axis_row].set_ylim(0, 5000)
+                axs[axis_slice][axis_row].set_frame_on(False)
+        
+        # Adjust labels for edges
+        for ax in axs[:, 0]:
+            plt.setp(ax.get_yticklabels(), visible=True)
+
+        for ax in axs[len(axs) - 1, :]:
+            plt.setp(ax.get_xticklabels(), visible=True)
 
     if method == "norm":
         ranges = obs_range(dataset, observer_slices)
@@ -91,7 +101,7 @@ observer_slices = 18
 opa_slices = 10
 
 colors = ["red", "green"]
-fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
+fig, axs = plt.subplots(ncols=observer_slices, nrows=(opa_slices + 1), squeeze=False, sharex=True)
 
 for i in range(len(datasets)):
     run_dataset(datasets[i], axs, observer_slices, opa_slices, color=colors[i])
