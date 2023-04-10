@@ -29,23 +29,31 @@ opa_slices = 3
 max_observers = datasets[0].shape[0]
 max_cases = datasets[0].shape[1]
 
-obs_step = max_observers // observer_slices
-
-
 dataset = datasets[0]
+
+
 # Max/min of observer slice
+def obs_range(dataset, observer_slices):
+    # max number of observers / number of slices
+    obs_step = dataset.shape[0] // observer_slices
+    mins = np.amin(dataset[obs_step::obs_step], axis=2)
+    maxs = np.amax(dataset[obs_step::obs_step], axis=2)
+    return np.dstack((mins, maxs))
 
-mins = np.amin(dataset[obs_step::obs_step], axis=2)
-maxs = np.amax(dataset[obs_step::obs_step], axis=2)
-ranges = np.dstack((mins, maxs))
+def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
+    # max number of observers / number of slices
+    obs_step = dataset.shape[0] // observer_slices
+    # max number of buckets / number of slices
+    bucket_step = buckets // opa_slices
 
-# For each , calculate mean and std deviation in cases for OPA of .33, .66, and .99
-max_buckets = 100
-bucket_step = 100 // opa_slices
-bucketed = lib.bucket(dataset, max_buckets)[obs_step::obs_step, :, bucket_step::bucket_step]
-means = np.average(bucketed, axis=1)
-std_devs = np.std(bucketed, axis=1)
-stats = np.dstack((means, std_devs))
+    bucketed = lib.bucket(dataset, buckets)[obs_step::obs_step, :, bucket_step::bucket_step]
+    means = np.average(bucketed, axis=1)
+    std_devs = np.std(bucketed, axis=1)
+    return np.dstack((means, std_devs))
+
+
+ranges = obs_range(dataset, observer_slices)
+stats = opa_stats(dataset, observer_slices, opa_slices)
 
 # Graphing! stats and ranges
 colors = ["red", "green"]
@@ -60,7 +68,14 @@ for row in range(observer_slices):
 
     # # Graph stats
     for opa_slice in range(opa_slices):
-        axs[row][opa_slice + 1].plot(xs, norm.pdf(xs, stats[row][opa_slice][0], stats[row][opa_slice][1]), color=color)
+        axs[row][opa_slice + 1].plot(
+            xs, 
+            norm.pdf(
+                xs, 
+                stats[row][opa_slice][0], 
+                stats[row][opa_slice][1]
+            ), 
+            color=color)
 
 plt.show()
 
