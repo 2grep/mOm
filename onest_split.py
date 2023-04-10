@@ -22,47 +22,73 @@ def obs_range(dataset, observer_slices):
     maxs = np.amax(dataset[obs_step::obs_step], axis=2)
     return np.dstack((mins, maxs))
 
-def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
+def opa_hist(dataset, observer_slices, opa_slices, buckets=100):
     '''
-    Calculate statistics (means and standard deviations) of dataset.
+    Calculate histogram of dataset for observers and slices.
     '''
     # max number of observers / number of slices
     obs_step = dataset.shape[0] // observer_slices
     # max number of buckets / number of slices
     bucket_step = buckets // opa_slices
 
-    bucketed = lib.bucket(dataset, buckets)[obs_step::obs_step, :, bucket_step::bucket_step]
+    return lib.bucket(dataset, buckets)[obs_step::obs_step, :, bucket_step::bucket_step]
+
+def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
+    '''
+    Calculate statistics (means and standard deviations) of dataset.
+    '''
+    bucketed = opa_hist(dataset, observer_slices, opa_slices, buckets)
     means = np.average(bucketed, axis=1)
     std_devs = np.std(bucketed, axis=1)
     return np.dstack((means, std_devs))
 
-def run_dataset(dataset, axs, observer_slices=3, opa_slices=3, color="gray"):
-    ranges = obs_range(dataset, observer_slices)
-    stats = opa_stats(dataset, observer_slices, opa_slices)
+def run_dataset(dataset, axs, observer_slices=3, opa_slices=3, color="gray", method="hist"):
+    if method == "hist":
+        ranges = obs_range(dataset, observer_slices)
+        # * buckets >= opa_slices
+        hist = opa_hist(dataset, observer_slices, opa_slices, buckets=10)
 
-    xs = np.arange(0, dataset.shape[1])
-    for row in range(observer_slices):
-        # Graph ranges
-        axs[row][0].plot(xs, ranges[row][:, 0], color=color)
-        axs[row][0].plot(xs, ranges[row][:, 1], color=color)
+        xs = np.arange(0, dataset.shape[1])
+        bins = np.arange(0, dataset.shape[1], 5)
+        for row in range(observer_slices):
+            # Graph ranges
+            axis_row = observer_slices - row - 1
+            axs[axis_row][0].plot(xs, ranges[row][:, 0], color=color)
+            axs[axis_row][0].plot(xs, ranges[row][:, 1], color=color)
 
-        # Graph stats
-        for opa_slice in range(opa_slices):
-            axs[row][opa_slice + 1].plot(
-                xs, 
-                norm.pdf(
+            for opa_slice in range(opa_slices):
+                axs[axis_row][opa_slice + 1].hist(
+                    xs, bins=bins, weights=hist[row, : , opa_slice], 
+                    align="left", color=color, alpha=.5)
+                axs[axis_row][opa_slice + 1].set_ylim(0, 5000)
+
+    if method == "norm":
+        ranges = obs_range(dataset, observer_slices)
+        stats = opa_stats(dataset, observer_slices, opa_slices)
+
+        xs = np.arange(0, dataset.shape[1])
+        for row in range(observer_slices):
+            # Graph ranges
+            axs[row][0].plot(xs, ranges[row][:, 0], color=color)
+            axs[row][0].plot(xs, ranges[row][:, 1], color=color)
+
+            # Graph stats
+            for opa_slice in range(opa_slices):
+                axs[row][opa_slice + 1].plot(
                     xs, 
-                    stats[row][opa_slice][0], 
-                    stats[row][opa_slice][1]
-                ), 
-                color=color)
+                    norm.pdf(
+                        xs, 
+                        stats[row][opa_slice][0], 
+                        stats[row][opa_slice][1]
+                    ), 
+                    color=color)
 
 
 dataset_names = ["assisted.npy", "unassisted.npy"]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-observer_slices = 3
-opa_slices = 3
+observer_slices = 18
+opa_slices = 10
 
 colors = ["red", "green"]
 fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
