@@ -25,9 +25,9 @@ datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 observer_slices = 3
 opa_slices = 3
 
-# Calculate step sizes
-max_observers = datasets[0].shape[0]
-max_cases = datasets[0].shape[1]
+colors = ["red", "green"]
+color = colors[0]
+fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
 
 dataset = datasets[0]
 
@@ -51,31 +51,28 @@ def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
     std_devs = np.std(bucketed, axis=1)
     return np.dstack((means, std_devs))
 
+def run_dataset(dataset, axs, observer_slices=3, opa_slices=3):
+    ranges = obs_range(dataset, observer_slices)
+    stats = opa_stats(dataset, observer_slices, opa_slices)
 
-ranges = obs_range(dataset, observer_slices)
-stats = opa_stats(dataset, observer_slices, opa_slices)
+    xs = np.arange(0, dataset.shape[1])
+    for row in range(observer_slices):
+        # Graph ranges
+        axs[row][0].plot(xs, ranges[row][:, 0], color=color)
+        axs[row][0].plot(xs, ranges[row][:, 1], color=color)
 
-# Graphing! stats and ranges
-colors = ["red", "green"]
-color = colors[0]
-fig, axs = plt.subplots(nrows=observer_slices, ncols=(opa_slices + 1), squeeze=False)
-
-# Graph ranges
-xs = np.arange(0, max_cases)
-for row in range(observer_slices):
-    axs[row][0].plot(xs, ranges[row][:, 0], color=color)
-    axs[row][0].plot(xs, ranges[row][:, 1], color=color)
-
-    # # Graph stats
-    for opa_slice in range(opa_slices):
-        axs[row][opa_slice + 1].plot(
-            xs, 
-            norm.pdf(
+        # Graph stats
+        for opa_slice in range(opa_slices):
+            axs[row][opa_slice + 1].plot(
                 xs, 
-                stats[row][opa_slice][0], 
-                stats[row][opa_slice][1]
-            ), 
-            color=color)
+                norm.pdf(
+                    xs, 
+                    stats[row][opa_slice][0], 
+                    stats[row][opa_slice][1]
+                ), 
+                color=color)
+
+run_dataset(dataset, axs, observer_slices, opa_slices)
 
 plt.show()
 
