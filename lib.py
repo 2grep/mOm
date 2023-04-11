@@ -1,35 +1,38 @@
 import os
-from numpy import typing as nptyp
+from random import random
 import numpy as np
 from collections import deque
 import typing as typ
-
 import pandas as pd
 
 
-def bucket(dataset: nptyp.ArrayLike, 
-           num_buckets: int, 
-           range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)) -> nptyp.NDArray:
+def bucket(
+        dataset: np.ndarray, 
+        num_buckets: int, 
+        range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)) -> np.ndarray:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
     (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
 
-    range is exclusive on the right
+    range is exclusive on the right except the last bucket which is inclusive on both sides
     '''
-    # dataset = np.transpose(dataset, deque(dataset.shape).rotate(1))
+    spacer = (range[1] - range[0]) / num_buckets
+    return np.apply_along_axis(
+        lambda x: np.histogram(
+            x, 
+            bins=np.arange(
+                range[0], 
+                range[1] + spacer, 
+                spacer
+            )
+        )[0],
+        len(dataset.shape) - 1,
+        dataset
+    )
 
-    # num_buckets in the range of [ range[0], range[1] )
-    buckets = np.arange(range[0], range[1], 1/num_buckets).astype("float64", copy=False)
-    # replace values of dataset with appropriate bin in buckets
-    digitized = np.digitize(dataset, buckets) - 1
-
-    # bincount counts the number of times each integer occurs in a 1d-array
-    # in other words, we are replacing each layer with the count of the frequency of each bucket in that layer
-    # (observers, cases, OPA) 
-    # (e.g. bucket_reduced[5-2][100-1][int(.5*100)] is the number of points at 5 observers, 100 cases, and an OPA of .5)
-    return np.apply_along_axis(lambda x: np.bincount(x, minlength=100), len(digitized.shape) - 1, digitized)
-
-def rotate(arr, num):
+def rotate(
+        arr: np.ndarray, 
+        num: int) -> np.ndarray:
     '''
     Rotate the ordering of the indices of arr
     '''
@@ -54,3 +57,15 @@ def data_reader(file_name):
         data = pd.read_csv(file_name)
         print(data)
         return data
+
+def random_unique_permutations(array, max_choices=-2):
+    max_choices += 1
+    prev_permutations = []
+    while True:
+        random.shuffle(array)
+        new_permutation = array[:max_choices]
+        while new_permutation in prev_permutations:
+            random.shuffle(array)
+            new_permutation = array[:max_choices]
+
+        yield new_permutation

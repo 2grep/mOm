@@ -8,6 +8,7 @@ import pandas as pd
 from pprint import pprint
 import random as random
 import time
+import lib
 
 ## ARGUMENTS ##
 # TODO: convert unique_curves and o_max to inputted values
@@ -88,18 +89,6 @@ def match(case, observers, fractional=False):
 
     else:
         return case[observers].value_counts().max() / len(observers)
-    
-def random_unique_permutations(array, max_choices=-2):
-    max_choices += 1
-    prev_permutations = []
-    while True:
-        random.shuffle(array)
-        new_permutation = array[:max_choices]
-        while new_permutation in prev_permutations:
-            random.shuffle(array)
-            new_permutation = array[:max_choices]
-
-        yield new_permutation
 
 def overall_proportion_agreement(case_observer_matrix, *args):
     '''
@@ -115,8 +104,8 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
     # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
     all_cases = list(case_observer_matrix.index)
-    observers_generator = random_unique_permutations(all_observers, max_num_observers)
-    cases_generator = random_unique_permutations(all_cases, max_num_cases)
+    observers_generator = lib.random_unique_permutations(all_observers, max_num_observers)
+    cases_generator = lib.random_unique_permutations(all_cases, max_num_cases)
 
     space = []
 
@@ -175,7 +164,7 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
 
     onest = pd.DataFrame()
     all_observers = list(case_observer_matrix.columns)
-    observers_generator = random_unique_permutations(all_observers, O_max)
+    observers_generator = lib.random_unique_permutations(all_observers, O_max)
 
     for new_curve in range(unique_curves):
         print("Running curve: ", new_curve)
