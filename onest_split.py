@@ -60,7 +60,7 @@ def opa_hist_ridge(
         certainty: int
     ) -> np.ndarray:
     '''
-    Find "ridge" values for the treatment and control histograms (i.e. where treatment >= control * certainty).
+    Find "ridge" values for the treatment and control histograms (i.e. where `treatment >= control * certainty`).
     '''
     is_valid = treatment >= control * certainty
     # If the treatment has nothing, that may not be a fail, but it certainly isn't success

@@ -10,7 +10,7 @@ def bucket(
     ) -> np.ndarray:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
-    (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
+    (i.e. if `dataset.shape = (19, 240, 1000)`, will bucket into `(19, 240, num_buckets)`).
 
     range is exclusive on the right except the last bucket which is inclusive on both sides
     '''
@@ -34,10 +34,13 @@ def opa_hist_ridge(
         certainty: int
     ) -> np.ndarray:
     '''
-    Find "ridge" values for the treatment and control histograms (i.e. where treatment >= control * certainty).
+    Find "ridge" values for the treatment and control histograms
+    (i.e. where `treatment >= control * certainty`).
     '''
     is_valid = treatment >= control * certainty
     # If the treatment has nothing, that may not be a fail, but it certainly isn't success
+    # Increasing this flattening could help iron out "creeper" points in the ridge (it does) without being bad data handling (idk about that)
+    # (e.g. treatment < 30 counts for statistical significance)
     is_valid[treatment == 0] = False
     return np.apply_along_axis(np.argmax, 1, is_valid)
 
@@ -57,12 +60,13 @@ def run_ridge(
     # ranges = [obs_range(dataset, observer_slices) for dataset in datasets]
     treatment = lib.bucket(datasets[0], opa_slices)
     control = lib.bucket(datasets[1], opa_slices)
+    print(control.shape)
     ridge = np.transpose(opa_hist_ridge(treatment, control, certainty))[::-1]
 
     np.savetxt(fname + ("" if ".csv" == fname[-4:] else ".csv"), ridge, fmt="%d", delimiter=",")
 
 # TODO: refactor to calculate these datasets more simply - this requires simplifying onest_analysis.py
-dataset_names = ["assisted_3case.npy", "unassisted_3case.npy"]
+dataset_names = ["assisted_5case.npy", "unassisted_5case.npy"]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-run_ridge(datasets, fname="ridge_3case")
+run_ridge(datasets, fname="ridge_5case")

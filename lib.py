@@ -53,13 +53,12 @@ def data_reader(
     _fname, fext = os.path.splitext(fname)
     names.append(_fname)
     exts.append(fext)
-
-    if fext == ".pkl":
-        return pd.read_pickle(fname)
-    elif fext == ".npy":
+    
+    if fext == ".npy":
         return np.load(fname)
-    else:
-        data = pd.read_csv(fname)
+    
+    elif fext == ".csv":
+        data = np.loadtxt(fname, delimiter=",")
         return data
 
 def random_unique_permutations(
@@ -80,3 +79,16 @@ def random_unique_permutations(
             new_permutation = arr[:max_choices]
 
         yield new_permutation
+
+
+def match(
+        arr: typ.Sequence
+    ) -> bool:
+    '''
+    Check if all in `arr` are the same value
+    '''
+    first = arr[0]
+    for item in arr:
+        if first != item:
+            return False
+    return True

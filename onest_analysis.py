@@ -12,6 +12,7 @@ import typing as typ
 
 ## ARGUMENTS ##
 # TODO: convert unique_curves and o_max to inputted values
+# TODO: add output file for resulting images and caches
 # TODO: add verbosity option
 # 0 - print nothing, just make the graph
 # 1 - print curve generation progress (preferably as loading bar)
@@ -47,72 +48,68 @@ datasets_from_cache = [".pkl", ".npy"] in file_exts
 # Written in the style of David Jin wrote these, originally here:
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
-
-def match(
-        case: typ.Sequence, 
-        observers: typ.Sequence[int]
-    ) -> bool:
-    '''
-    Check if all observers of case match.
-    '''
-    ## Python/early quit match
-    first = case[observers[0]]
-    for observer in observers[1:len(observers)]:
-        # if the observations are different
-        if case[observer] != first:
-            return False
-    return True
-
 def overall_proportion_agreement(
-        case_observer_matrix: pd.DataFrame, 
-        *args: ...
+        case_observer_matrix: np.ndarray
     ) -> float:
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
+
+    Assumes observers are in first dimension
     '''
     # Check for matches across rows
-    case_agreements = case_observer_matrix.apply(match, args=args, axis=1)
+    case_agreements = np.apply_along_axis(lib.match, 0, case_observer_matrix)
     # number of full row-matches / number of cases
-    return case_agreements.sum() / len(case_observer_matrix.index)
+    return case_agreements.sum() / case_observer_matrix.shape[0]
 
 def sarape(
-        case_observer_matrix: pd.DataFrame, 
+        case_observer_matrix: np.ndarray, 
         num_unique_surfaces: int, 
         max_num_cases: int, 
         max_num_observers: int
     ) -> np.ndarray:
+    '''
+    Parameters
+    ----------
+    case_observer_matrix : observers O x cases c matrix
+        ```
+        [[A0, A1, ..., Ac],
+         [B0, B1, ..., Bc],
+         ...
+         [O0, O1, ..., Oc]]
+        ```
+    '''
     # Generators for observers and cases
-    all_observers = list(case_observer_matrix.columns)
-    all_cases = list(case_observer_matrix.index)
-    observers_generator = lib.random_unique_permutations(all_observers, max_num_observers)
-    cases_generator = lib.random_unique_permutations(all_cases, max_num_cases)
 
-    space = []
+    num_observers = case_observer_matrix.shape[0]
+    num_cases = case_observer_matrix.shape[1]
+    observers_generator = lib.random_unique_permutations(np.arange(num_observers), max_num_observers)
+    cases_generator = lib.random_unique_permutations(np.arange(num_cases), max_num_cases)
 
     opa_calculation_time = 0
 
+    space = []
     for new_surface in np.arange(num_unique_surfaces):
         print("Running surface:", new_surface)
 
-        surface_cases = next(cases_generator)
         surface_observers = next(observers_generator)
+        surface_cases = next(cases_generator)
 
         # cases x observers
         opa_grid = []
-        for cumulative_case_index in range(1, len(surface_cases) + 1):
+        for cumulative_case_index in range(num_cases):
             print("Running case:", str(new_surface) + "." + str(cumulative_case_index))
 
+            reduced_cases = surface_cases[:cumulative_case_index + 1]
             observer_opas = []
-            for cumulative_observer_index in range(2, len(surface_observers)):
-                # iloc lets us just look at the indices as integers
-                reduced_cases = case_observer_matrix.iloc[surface_cases[:cumulative_case_index]]
+            for cumulative_observer_index in range(2, num_observers):
                 reduced_observers = surface_observers[:cumulative_observer_index]
 
+                # TODO: only transpose once
+                # We need to index twice bc of broadcasting isues between the two indices
+                matrix = case_observer_matrix[reduced_observers][:, reduced_cases]
+
                 start = time.time()
-                opa = overall_proportion_agreement(
-                    reduced_cases,
-                    reduced_observers
-                )
+                opa = overall_proportion_agreement(matrix)
                 end = time.time()
                 opa_calculation_time += end - start
 
@@ -122,7 +119,6 @@ def sarape(
     print("OPA calculation time:", opa_calculation_time)
 
     return np.array(space, copy=False)
-
 
 def onest(
         case_observer_matrix: pd.DataFrame, 
@@ -251,12 +247,12 @@ elif args.model == "sarape":
         for cases_x_observers_matrix in args.datasets:
             # Get case x observer bounds
             unique_surfaces = 1000
-            max_num_cases = len(cases_x_observers_matrix.index)
-            max_num_observers = len(cases_x_observers_matrix.columns)
+            max_num_cases = cases_x_observers_matrix.shape[0]
+            max_num_observers = cases_x_observers_matrix.shape[1]
 
             start = time.time()
             single_analysis = sarape(
-                cases_x_observers_matrix, unique_surfaces, max_num_cases, max_num_observers)
+                np.transpose(cases_x_observers_matrix), unique_surfaces, max_num_cases, max_num_observers)
             end = time.time()
             print("ONEST calculation time:", end - start)
 
