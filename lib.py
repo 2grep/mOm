@@ -5,11 +5,11 @@ from collections import deque
 import typing as typ
 import pandas as pd
 
-
 def bucket(
         dataset: np.ndarray, 
         num_buckets: int, 
-        range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)) -> np.ndarray:
+        range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)
+    ) -> np.ndarray:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
     (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
@@ -32,7 +32,8 @@ def bucket(
 
 def rotate(
         arr: np.ndarray, 
-        num: int) -> np.ndarray:
+        num: int
+    ) -> np.ndarray:
     '''
     Rotate the ordering of the indices of arr
     '''
@@ -61,14 +62,21 @@ def data_reader(
         data = pd.read_csv(fname)
         return data
 
-def random_unique_permutations(array, max_choices=-2):
+def random_unique_permutations(
+        arr: typ.MutableSequence, 
+        max_choices: int = -2
+    ) -> typ.Generator[typ.MutableSequence, None, None]:
+    '''
+    Generate random, unique permutations of arr upto max_choices number of values.
+    WILL enter infinite loop if called more than len(arr)! times. We do NOT check for this.
+    '''
     max_choices += 1
     prev_permutations = []
     while True:
-        random.shuffle(array)
-        new_permutation = array[:max_choices]
+        random.shuffle(arr)
+        new_permutation = arr[:max_choices]
         while new_permutation in prev_permutations:
-            random.shuffle(array)
-            new_permutation = array[:max_choices]
+            random.shuffle(arr)
+            new_permutation = arr[:max_choices]
 
         yield new_permutation

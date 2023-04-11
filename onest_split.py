@@ -1,13 +1,18 @@
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import matplotlib as mpl
 import numpy as np
 from scipy.stats import norm
 import random as random
 import lib
 import typing as typ
 
+# * This is basically deprecated by ridge.py except for getting the bigger histogram
+
 # Max/min of observer slice
-def obs_range(dataset, observer_slices):
+def obs_range(
+        dataset: np.ndarray, 
+        observer_slices: int
+    ) -> np.ndarray:
     '''
     Calculate mins and maxs of dataset.
     '''
@@ -17,7 +22,12 @@ def obs_range(dataset, observer_slices):
     maxs = np.amax(dataset[obs_step::obs_step], axis=2)
     return np.dstack((mins, maxs))
 
-def opa_hist(dataset, observer_slices, opa_slices, buckets=100):
+def opa_hist(
+        dataset: np.ndarray, 
+        observer_slices: int, 
+        opa_slices: int, 
+        buckets: int = 100
+    ) -> np.ndarray:
     '''
     Calculate histogram of dataset for observers and slices.
     '''
@@ -28,7 +38,12 @@ def opa_hist(dataset, observer_slices, opa_slices, buckets=100):
     print(buckets, bucket_step)
     return lib.bucket(dataset, buckets)[::obs_step, :, ::bucket_step]
 
-def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
+def opa_stats(
+        dataset: np.ndarray, 
+        observer_slices: int, 
+        opa_slices: int, 
+        buckets: int = 100
+    ) -> np.ndarray:
     '''
     Calculate statistics (means and standard deviations) of dataset.
     '''
@@ -42,7 +57,8 @@ def opa_stats(dataset, observer_slices, opa_slices, buckets=100):
 def opa_hist_ridge(
         treatment: np.ndarray, 
         control: np.ndarray, 
-        certainty: int):
+        certainty: int
+    ) -> np.ndarray:
     '''
     Find "ridge" values for the treatment and control histograms (i.e. where treatment >= control * certainty).
     '''
@@ -51,7 +67,17 @@ def opa_hist_ridge(
     is_valid[treatment == 0] = False
     return np.apply_along_axis(np.argmax, 1, is_valid)
 
-def run_dataset(dataset, axs, observer_slices=3, opa_slices=3, color="gray", method="hist"):
+def run_dataset(
+        dataset: np.ndarray, 
+        axs: plt.Axes, 
+        observer_slices: int = 3, 
+        opa_slices: int = 3, 
+        color: mpl.Color = "gray", 
+        method: str = "hist"
+    ) -> None:
+    '''
+    Run dataset for either histogram or normal ditribution graph.
+    '''
     if method == "hist":
         ranges = obs_range(dataset, observer_slices)
         # * buckets >= opa_slices
@@ -98,7 +124,8 @@ def run_ridge(
         datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]], 
         observer_slices: int = 3, 
         opa_slices: int = 3,
-        certainty: int = 9):
+        certainty: int = 9
+    ) -> None:
     '''
     datasets: treatment, control
     '''

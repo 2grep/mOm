@@ -3,11 +3,12 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, LinearLocator)
 import numpy as np
-import os
 import pandas as pd
-import random as random
 import time
 import lib
+import typing as typ
+
+# TODO: convert from pandas DataFrames to NumPy nd_arrays for ALL calculations
 
 ## ARGUMENTS ##
 # TODO: convert unique_curves and o_max to inputted values
@@ -16,8 +17,6 @@ import lib
 # 1 - print curve generation progress (preferably as loading bar)
 #       Progress: |█████████████████████████████████████████████-----| 90/100 Curve(s) Complete
 #       (https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020)
-# TODO: defeat entropy and make dev mode where it uses a pre-made set of obervers with each run rather than regenerating each time
-# TODO!: add in ga and esi support
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
@@ -28,9 +27,7 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
     dest="model", 
     choices=[
         "onest",
-        "sarape",
-        "ga",
-        "esi"
+        "sarape"
     ], required=True)
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
 # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
@@ -51,20 +48,25 @@ datasets_from_cache = [".pkl", ".npy"] in file_exts
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
 
-def match(case, observers):
+def match(
+        case: typ.Sequence, 
+        observers: typ.Sequence[int]
+    ) -> bool:
     '''
     Check if all observers of case match.
-    Returns: 1 if all observers match, else 0
     '''
     ## Python/early quit match
     first = case[observers[0]]
     for observer in observers[1:len(observers)]:
         # if the observations are different
         if case[observer] != first:
-            return 0
-    return 1
+            return False
+    return True
 
-def overall_proportion_agreement(case_observer_matrix, *args):
+def overall_proportion_agreement(
+        case_observer_matrix: pd.DataFrame, 
+        *args: ...
+    ) -> float:
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
     '''
@@ -73,7 +75,12 @@ def overall_proportion_agreement(case_observer_matrix, *args):
     # number of full row-matches / number of cases
     return case_agreements.sum() / len(case_observer_matrix.index)
 
-def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers):
+def sarape(
+        case_observer_matrix: pd.DataFrame, 
+        num_unique_surfaces: int, 
+        max_num_cases: int, 
+        max_num_observers: int
+    ) -> np.ndarray:
     # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
     all_cases = list(case_observer_matrix.index)
@@ -114,10 +121,14 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
         space.append(opa_grid)
     print("OPA calculation time:", opa_calculation_time)
 
-    return space
+    return np.array(space, copy=False)
 
 
-def onest(case_observer_matrix, unique_curves, O_max):
+def onest(
+        case_observer_matrix: pd.DataFrame, 
+        unique_curves: int, 
+        O_max: int
+    ) -> pd.DataFrame: # TODO: should really just return an ndarray
     '''
     onest takes in the (case X observer m) matrix and the desired number of iterations C, and returns a C x O_m-1 matrix of OPAs
     [
@@ -220,10 +231,6 @@ if args.model == "onest":
 
 elif args.model == "sarape":
     # TODO: adjust this to work with both cached and uncached data
-    # Options:
-    # - Tensorflow tensors; no labels and seems a little overkill but definitely solid
-    # - Xarray; basically N-dimensional extension of pandas but seperate package
-    # - Pandas MultiIndexes (https://stackoverflow.com/a/36760901/16755079); full consistency in pandas but a bit to juggle levels (need `xs()`)
     # - NumPy ndarray (aka. just go all in on numpy); more overhead in flipping around the data but full consistency
 
     # observers_min = args.datasets[0].index[0]
@@ -238,7 +245,6 @@ elif args.model == "sarape":
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
 
     # Run ONEST with O observers and C cases (for each cell in [observers_axis x cases_axis])
-
     case_onest_analyses = []
     counter = 0
     if not datasets_from_cache:
@@ -284,17 +290,21 @@ elif args.model == "sarape":
     else:
         dataset_surfaces = np.asarray(case_onest_analyses)
 
-    # Could try MayaVi for less glitchy plots (https://stackoverflow.com/a/43004221)
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
     # Plot the surface
-    surfs = []
-    # TODO: make these colors available in -c argument
     colors = ["coolwarm", "PiYG"]
+
     print(dataset_surfaces.shape)
     for dataset in np.arange(dataset_surfaces.shape[0]):
         for surface in dataset_surfaces[dataset]:
-            surf = ax.plot_surface(observers_axis, cases_axis, surface, cmap=colors[dataset % len(colors)],
-                                linewidth=0, antialiased=False)
+            ax.plot_surface(
+                observers_axis, 
+                cases_axis, 
+                surface, 
+                cmap=colors[dataset % len(colors)],
+                inewidth=0, 
+                antialiased=False
+            )
 
     # Customize the z axis.
     ax.xaxis.set_major_locator(MultipleLocator(6))
@@ -307,10 +317,6 @@ elif args.model == "sarape":
     ax.set_zlabel("Overall Proportion Agreement")
 
     ax.zaxis.set_major_locator(LinearLocator(10))
-    # A StrMethodFormatter is used automatically
     ax.zaxis.set_major_formatter('{x:.02f}')
-
-    # Add a color bar which maps values to colors.
-    # fig.colorbar(surf, shrink=0.5, aspect=5)
 
     plt.show()
