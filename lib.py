@@ -3,7 +3,6 @@ import random
 import numpy as np
 from collections import deque
 import typing as typ
-import pandas as pd
 
 def bucket(
         dataset: np.ndarray, 

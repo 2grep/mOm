@@ -59,15 +59,17 @@ def overall_proportion_agreement(
     # Check for matches across rows
     case_agreements = np.apply_along_axis(lib.match, 0, case_observer_matrix)
     # number of full row-matches / number of cases
-    return case_agreements.sum() / case_observer_matrix.shape[0]
+    return case_agreements.sum() / case_observer_matrix.shape[1]
 
 def sarape(
         case_observer_matrix: np.ndarray, 
-        num_unique_surfaces: int, 
-        max_num_cases: int, 
-        max_num_observers: int
+        unique_surfaces: int, 
+        max_observers: int,
+        max_cases: int
     ) -> np.ndarray:
     '''
+    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from the full space of samples
+
     Parameters
     ----------
     case_observer_matrix : observers O x cases c matrix
@@ -77,47 +79,47 @@ def sarape(
          ...
          [O0, O1, ..., Oc]]
         ```
+    unique_surfaces : number of surfaces to run
+        More surfaces is a better sample of the full space but takes longer. However, this MUST be less 
+        than `min(case_observer_matrix.shape)!` or this will enter an infinite loop; we do NOT check for this.
+    max_observers, max_cases : a maximum limit to the number of observers/cases to use in each surface
+        will use the minimum of this and respective axis shape of case_observer_matrix
+    
+    Returns
+    -------
+    sarape : surfaces calculated as shape `(unique_surfaces, cases, observers - 1)`
     '''
     # Generators for observers and cases
 
-    num_observers = case_observer_matrix.shape[0]
+    num_obs = case_observer_matrix.shape[0]
     num_cases = case_observer_matrix.shape[1]
-    observers_generator = lib.random_unique_permutations(np.arange(num_observers), max_num_observers)
-    cases_generator = lib.random_unique_permutations(np.arange(num_cases), max_num_cases)
-
-    opa_calculation_time = 0
+    obs_gen = lib.random_unique_permutations(np.arange(num_obs), max_observers)
+    cases_gen = lib.random_unique_permutations(np.arange(num_cases), max_cases)
 
     space = []
-    for new_surface in np.arange(num_unique_surfaces):
-        print("Running surface:", new_surface)
+    for new_surface in np.arange(unique_surfaces):
+        if new_surface % 10 == 0:
+            print("Running surface:", new_surface)
 
-        surface_observers = next(observers_generator)
-        surface_cases = next(cases_generator)
+        surf_obs = next(obs_gen)
+        surf_cases = next(cases_gen)
 
         # cases x observers
         opa_grid = []
-        for cumulative_case_index in range(num_cases):
-            print("Running case:", str(new_surface) + "." + str(cumulative_case_index))
+        for case_ind in range(num_cases):
+            reduced_cases = surf_cases[:case_ind + 1]
 
-            reduced_cases = surface_cases[:cumulative_case_index + 1]
             observer_opas = []
-            for cumulative_observer_index in range(2, num_observers):
-                reduced_observers = surface_observers[:cumulative_observer_index]
-
-                # TODO: only transpose once
+            for obs_ind in range(2, num_obs + 1):
+                reduced_obs = surf_obs[:obs_ind]
+                
                 # We need to index twice bc of broadcasting isues between the two indices
-                matrix = case_observer_matrix[reduced_observers][:, reduced_cases]
-
-                start = time.time()
+                matrix = case_observer_matrix[reduced_obs][:, reduced_cases]
                 opa = overall_proportion_agreement(matrix)
-                end = time.time()
-                opa_calculation_time += end - start
 
                 observer_opas.append(opa)
             opa_grid.append(observer_opas)
         space.append(opa_grid)
-    print("OPA calculation time:", opa_calculation_time)
-
     return np.array(space, copy=False)
 
 def onest(

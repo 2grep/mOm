@@ -96,6 +96,7 @@ ipython_config.py
 *.png
 
 # data files
+data/
 *.pkl 
 *.npy
 *.xlsx
