@@ -41,21 +41,24 @@ def rotate(
     return np.transpose(arr, ind)
 
 
-def data_reader(file_name):
+def data_reader(
+        fname: str,
+        names: list[str] = [],
+        exts: list[str] = []):
     '''
-    Read in data from file
+    Read in data from file.
+    Appends file names and extensions to names and exts repectively if specified.
     '''
-    fname, fext = os.path.splitext(file_name)
+    _fname, fext = os.path.splitext(fname)
+    names.append(_fname)
+    exts.append(fext)
 
     if fext == ".pkl":
-        datasets_from_cache = True
-        return pd.read_pickle(file_name)
+        return pd.read_pickle(fname)
     elif fext == ".npy":
-        datasets_from_cache = True
-        return np.load(file_name)
+        return np.load(fname)
     else:
-        data = pd.read_csv(file_name)
-        print(data)
+        data = pd.read_csv(fname)
         return data
 
 def random_unique_permutations(array, max_choices=-2):

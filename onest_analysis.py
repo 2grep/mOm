@@ -1,11 +1,10 @@
 #!usr/bin/env python3
 import argparse
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, LinearLocator)
+from matplotlib.ticker import (MultipleLocator, LinearLocator)
 import numpy as np
 import os
 import pandas as pd
-from pprint import pprint
 import random as random
 import time
 import lib
@@ -42,28 +41,11 @@ parser.add_argument("--cache", help="If flagged, caches data after processing", 
 
 args = parser.parse_args()
 
-datasets_from_cache = False
 file_names = []
+file_exts = []
+args.datasets = [lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names]
 
-def data_reader(file_name):
-    global datasets_from_cache
-    fname, fext = os.path.splitext(file_name)
-    file_names.append(fname)
-
-    print("Name:", fname, "Ext:", fext)
-    if fext == ".pkl":
-        datasets_from_cache = True
-        return pd.read_pickle(file_name)
-    elif fext == ".npy":
-        datasets_from_cache = True
-        return np.load(file_name)
-    else:
-        data = pd.read_csv(file_name)
-        print(data)
-        return data
-
-
-args.datasets = [data_reader(set) for set in args.dataset_names]
+datasets_from_cache = [".pkl", ".npy"] in file_exts
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here:
@@ -99,7 +81,6 @@ def overall_proportion_agreement(case_observer_matrix, *args):
     # number of full row-matches / number of cases
     return case_agreements.sum() / len(case_observer_matrix.index)
 
-
 def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers, fractional=False):
     # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
@@ -109,24 +90,22 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
 
     space = []
 
-    # case_reduction_time = 0
-    # observer_reduction_time = 0
     opa_calculation_time = 0
 
     for new_surface in np.arange(num_unique_surfaces):
         print("Running surface:", new_surface)
+
         surface_cases = next(cases_generator)
         surface_observers = next(observers_generator)
 
         # cases x observers
         opa_grid = []
-
         for cumulative_case_index in range(1, len(surface_cases) + 1):
             print("Running case:", str(new_surface) + "." + str(cumulative_case_index))
-            observer_opas = []
 
+            observer_opas = []
             for cumulative_observer_index in range(2, len(surface_observers)):
-                # I don't know why, but using `iloc` instead of `loc` makes matching an order of magnitude faster
+                # iloc lets us just look at the indices as integers
                 reduced_cases = case_observer_matrix.iloc[surface_cases[:cumulative_case_index]]
                 reduced_observers = surface_observers[:cumulative_observer_index]
 

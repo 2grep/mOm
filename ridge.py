@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.stats import norm
 import random as random
 import typing as typ
 import lib
@@ -62,6 +61,7 @@ def run_ridge(
 
     np.savetxt(fname + ("" if ".csv" == fname[-4:] else ".csv"), ridge, fmt="%d", delimiter=",")
 
+# TODO: refactor to calculate these datasets more simply
 dataset_names = ["assisted_3case.npy", "unassisted_3case.npy"]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
