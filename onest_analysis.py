@@ -32,7 +32,6 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
         "ga",
         "esi"
     ], required=True)
-parser.add_argument("-f", "--fractional", help="Use fractional agreement in ONEST model", dest="fractional", action="store_true")
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
 # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
 parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
@@ -52,25 +51,18 @@ datasets_from_cache = [".pkl", ".npy"] in file_exts
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
 
-def match(case, observers, fractional=False):
+def match(case, observers):
     '''
     Check if all observers of case match.
-    If fractional is set to true, computes fractional agreement: max agreements / number of observers
-
     Returns: 1 if all observers match, else 0
-
     '''
-    if not fractional:
-        ## Python/early quit match
-        first = case[observers[0]]
-        for observer in observers[1:len(observers)]:
-            # if the observations are different
-            if case[observer] != first:
-                return 0
-        return 1
-
-    else:
-        return case[observers].value_counts().max() / len(observers)
+    ## Python/early quit match
+    first = case[observers[0]]
+    for observer in observers[1:len(observers)]:
+        # if the observations are different
+        if case[observer] != first:
+            return 0
+    return 1
 
 def overall_proportion_agreement(case_observer_matrix, *args):
     '''
@@ -81,7 +73,7 @@ def overall_proportion_agreement(case_observer_matrix, *args):
     # number of full row-matches / number of cases
     return case_agreements.sum() / len(case_observer_matrix.index)
 
-def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers, fractional=False):
+def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_observers):
     # Generators for observers and cases
     all_observers = list(case_observer_matrix.columns)
     all_cases = list(case_observer_matrix.index)
@@ -112,8 +104,8 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
                 start = time.time()
                 opa = overall_proportion_agreement(
                     reduced_cases,
-                    reduced_observers,
-                    fractional)
+                    reduced_observers
+                )
                 end = time.time()
                 opa_calculation_time += end - start
 
@@ -125,7 +117,7 @@ def sarape(case_observer_matrix, num_unique_surfaces, max_num_cases, max_num_obs
     return space
 
 
-def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
+def onest(case_observer_matrix, unique_curves, O_max):
     '''
     onest takes in the (case X observer m) matrix and the desired number of iterations C, and returns a C x O_m-1 matrix of OPAs
     [
@@ -154,7 +146,7 @@ def onest(case_observer_matrix, unique_curves, O_max, fractional=False):
         curve = []
         for index in range(2, len(observers_for_this_curve)):
             # num of observers x OPA point on the ONEST curve
-            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index], fractional))
+            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
 
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
     return onest
@@ -173,7 +165,7 @@ if args.model == "onest":
             # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
             # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
             o_max = len(cases_x_observers_matrix.columns)
-            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max, args.fractional)
+            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max)
             if args.describe:
                 # Desribe as mean, min, max if desired
                 cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
@@ -258,7 +250,7 @@ elif args.model == "sarape":
 
             start = time.time()
             single_analysis = sarape(
-                cases_x_observers_matrix, unique_surfaces, max_num_cases, max_num_observers, args.fractional)
+                cases_x_observers_matrix, unique_surfaces, max_num_cases, max_num_observers)
             end = time.time()
             print("ONEST calculation time:", end - start)
 
