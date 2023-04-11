@@ -112,7 +112,7 @@ def sarape(
             observer_opas = []
             for obs_ind in range(2, num_obs + 1):
                 reduced_obs = surf_obs[:obs_ind]
-                
+
                 # We need to index twice bc of broadcasting isues between the two indices
                 matrix = case_observer_matrix[reduced_obs][:, reduced_cases]
                 opa = overall_proportion_agreement(matrix)
@@ -123,37 +123,38 @@ def sarape(
     return np.array(space, copy=False)
 
 def onest(
-        case_observer_matrix: pd.DataFrame, 
+        case_observer_matrix: np.ndarray, 
         unique_curves: int, 
-        O_max: int
-    ) -> pd.DataFrame: # TODO: should really just return an ndarray
+        max_observers: int
+    ) -> np.ndarray:
     '''
-    onest takes in the (case X observer m) matrix and the desired number of iterations C, and returns a C x O_m-1 matrix of OPAs
-    [
-     [opa1_1, opa1_2, ... opa1_Om-2, opa1_Om-1],
-     [opa2_1, opa2_2, ... opa2_Om-2, opa2_Om-1]
-      ....
-     [opaC_1, opaC_2, ... opaC_Om-2, opaC_Om-1]
-    ]
-    
-    unique_curves must be less than {O_m choose O_max} - WILL enter infinite loop if this condition is not held
-    We're not checking for this because if this is a problem, you shouldn't be using this.
+    Parameters
+    ----------
+    case_observer_matrix : observers O x cases c matrix
+        ```
+        [[A0, A1, ..., Ac],
+         [B0, B1, ..., Bc],
+         ...
+         [O0, O1, ..., Oc]]
+        ```
+    max_observers : a maximum limit to the number of observers to use in each curve
+        will use the minimum of this and `case_observer_matrix.shape[0]`
     '''
-    # slicing is exclusive, we assume O_max is inclusive (if you want to use 10 observers, you get 10 observers / 9 OPAs)
-    O_max += 1
+    # slicing is exclusive, we assume max_observers is inclusive (if you want to use 10 observers, you get 10 observers / 9 OPAs)
+    max_observers += 1
 
-    onest = pd.DataFrame()
-    all_observers = list(case_observer_matrix.columns)
-    observers_generator = lib.random_unique_permutations(all_observers, O_max)
+    onest = []
+    observers_generator = lib.random_unique_permutations(case_observer_matrix.shape[0], max_observers)
 
     for new_curve in range(unique_curves):
-        print("Running curve: ", new_curve)
-        ## Get the unique random permutaion of observers
+        if new_curve % 10 == 0:
+            print("Running curve: ", new_curve)
+
         observers_for_this_curve = next(observers_generator)
 
         ## Generate single onest curve
         curve = []
-        for index in range(2, len(observers_for_this_curve)):
+        for index in range(2, len(observers_for_this_curve) + 1):
             # num of observers x OPA point on the ONEST curve
             curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
 
