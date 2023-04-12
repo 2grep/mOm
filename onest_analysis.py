@@ -78,6 +78,7 @@ def sarape(
     unique_surfaces : number of surfaces to run
         More surfaces is a better sample of the full space but takes longer. However, this MUST be less 
         than `min(case_observer_matrix.shape)!` or this will enter an infinite loop; we do NOT check for this.
+        TODO: check if we are still entering infite loop. Really just need to better study `lib.random_unique_permutations`
     
     Returns
     -------
@@ -118,8 +119,7 @@ def sarape(
 
 def onest(
         case_observer_matrix: np.ndarray, 
-        unique_curves: int, 
-        max_observers: int
+        unique_curves: int
     ) -> np.ndarray:
     '''
     Parameters
@@ -131,102 +131,100 @@ def onest(
          ...
          [O0, O1, ..., Oc]]
         ```
-    max_observers : a maximum limit to the number of observers to use in each curve
-        will use the minimum of this and `case_observer_matrix.shape[0]`
-    '''
-    # slicing is exclusive, we assume max_observers is inclusive (if you want to use 10 observers, you get 10 observers / 9 OPAs)
-    max_observers += 1
+    unique_curves : number of curves to runs
 
+    Returns
+    -------
+    onest : 
+    '''
     onest = []
-    observers_generator = lib.random_unique_permutations(case_observer_matrix.shape[0], max_observers)
+    num_obs = case_observer_matrix.shape[0]
+    fuck = []
+    observers_generator = lib.random_unique_permutations(np.arange(num_obs), fuck)
 
     for new_curve in range(unique_curves):
         if new_curve % 10 == 0:
             print("Running curve: ", new_curve)
 
-        observers_for_this_curve = next(observers_generator)
+        curve_obs = next(observers_generator)
 
         ## Generate single onest curve
         curve = []
-        for index in range(2, len(observers_for_this_curve) + 1):
+        for ind in range(2, num_obs + 1):
             # num of observers x OPA point on the ONEST curve
-            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
+            reduced_obs = curve_obs[:ind]
+            matrix = case_observer_matrix[reduced_obs]
+            opa = overall_proportion_agreement(matrix)
+            curve.append(opa)
 
-        onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
-    return onest
+        onest.append(curve)
+    print(len(fuck))
+    return np.array(onest, copy=False)
 
 if args.model == "onest":
-    unique_curves = 100
+    unique_curves = 100000
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
-    dataset_onest_analyses = []
     if not datasets_from_cache:
         counter = 0
+        onest_analyses: list[np.ndarray] = []
         for cases_x_observers_matrix in args.datasets:
-            # ? How should we structure the call for unique_curves and O_max to be obvious and versatile
-            # Ideas:
-            # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
-            # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
-            # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
-            o_max = len(cases_x_observers_matrix.columns)
-            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max)
-            if args.describe:
-                # Desribe as mean, min, max if desired
-                cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+            analysis = onest(np.transpose(cases_x_observers_matrix), unique_curves)
 
-            dataset_onest_analyses.append(cases_x_observers_onest_analysis)
+            onest_analyses.append(analysis)
 
             if args.cache:
                 # TODO: Need to encode certain information in args such as if -d is flagged
-                cases_x_observers_onest_analysis.to_pickle(file_names[counter] + ".pkl")
+                np.save(file_names[counter] + ".npy", analysis)
                 counter += 1
+        onest_analyses = np.asarray(onest_analyses)
+        onest_analyses = np.transpose(onest_analyses, (0, 2, 1))
     
     else:
-        dataset_onest_analyses = args.datasets
+        onest_analyses = args.datasets
+
+    # ! put this in numpy terms
+    if args.describe:
+        # Desribe as min, mean, max if desired
+        onest_curves = np.dstack((
+            np.apply_along_axis(np.amin,    2, onest_analyses), 
+            np.apply_along_axis(np.average, 2, onest_analyses), 
+            np.apply_along_axis(np.amax,    2, onest_analyses)
+        ))
+
+    else:
+        onest_curves = onest_analyses
 
     ## Plot each analysis
     fig, ax = plt.subplots()
-    plots = [dataset_onest_analyses[0].plot.line(
-        style="-" if args.describe else "o-", 
-        color=args.colors[0], 
-        # legend=False, 
-        label="Label 1",
-        fillstyle="none",
-        linewidth=1 if args.describe else .5,
-        ax=ax
-    )]
-    counter = 0
-    for data in dataset_onest_analyses[1:]:
-        counter += 1
-        plots.append(
-            data.plot.line(
-                style="-" if args.describe else "o-",
-                color=args.colors[counter % len(args.colors)],
-                # legend=False,
-                fillstyle="none",
-                linewidth=1 if args.describe else .5,
-                ax=ax
-            )
+    obs_range = (2, onest_analyses.shape[1] + 1)
+    xs = np.arange(obs_range[0], obs_range[1] + 1)
+    for dataset in range(onest_curves.shape[0]):
+        ax.plot(
+            xs, onest_curves[dataset],
+            ("-" if args.describe else "o-"),
+            color=args.colors[dataset % len(args.colors)],
+            fillstyle="none",
+            linewidth=1 if args.describe else .5
         )
 
     # adjust plot parameters
     ax.xaxis.set_major_locator(MultipleLocator(6))
     ax.xaxis.set_major_formatter('{x:.0f}')
-    ax.set_xlim([dataset_onest_analyses[0].index[0],
-                dataset_onest_analyses[0].index[-1]])
+    ax.set_xlim(*obs_range)
     ax.set_xlabel("Number of Observers")
-    ax.set_ylim([0, 1])
+    ax.set_ylim(0, 1)
     ax.set_ylabel("Overall Proportion Agreement")
     ax.legend(ax.get_lines()[::(3 if args.describe else unique_curves)],
               args.labels if args.labels != None else file_names)
 
-    plt.show()
+    # plt.show()
 
 elif args.model == "sarape":
     # Run ONEST with S observers and C cases (for each cell in [observers_axis x cases_axis])
     if not datasets_from_cache:
         counter = 0
         case_onest_analyses: list[np.ndarray] = []
-        unique_surfaces = 10
+        unique_surfaces = 1000
 
         for cases_x_observers_matrix in args.datasets:
             # start = time.time()
@@ -269,7 +267,6 @@ elif args.model == "sarape":
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
     # Plot the surface
 
-    print(dataset_surfaces.shape)
     for dataset in range(dataset_surfaces.shape[0]):
         for surface in dataset_surfaces[dataset]:
             ax.plot_surface(

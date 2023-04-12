@@ -1,5 +1,6 @@
 import os
-import random
+# TODO: use numpy.random.Generator for shuffling
+import random as random
 import numpy as np
 from collections import deque
 import typing as typ
@@ -11,8 +12,8 @@ T = typ.TypeVar('T')
 ## Functions ##
 
 def bucket(
-        dataset: np.ndarray, 
-        num_buckets: int, 
+        dataset: np.ndarray,
+        num_buckets: int,
         range: typ.Union[tuple[int, int], list[int]] = (0, 1)
     ) -> np.ndarray:
     '''
@@ -38,7 +39,7 @@ def bucket(
 
 # TODO: I think this is deprecated. If so, get rid of it; if not, compare deque to list for rotating
 def rotate(
-        arr: np.ndarray, 
+        arr: np.ndarray,
         num: int
     ) -> np.ndarray:
     '''
@@ -70,7 +71,7 @@ def data_reader(
     raise Exception(f"{fext} is an unrecognized file extension for `fname`.")
 
 def random_unique_permutations(
-            arr: typ.MutableSequence[typ.Type[T]]
+        arr: typ.MutableSequence[typ.Type[T]]
     ) -> typ.Generator[typ.MutableSequence[typ.Type[T]], None, None]:
     '''
     Generate random, unique permutations of arr upto max_choices number of values.
@@ -86,7 +87,8 @@ def random_unique_permutations(
     ------
     random_unique_permutations : a new random, unique permutation of seq 
     '''
-    # TODO: check that this really is unique
+    # TODO: This is not truly unique and quickly fails for smaller numbers of observers. 
+    # * However, at the 20 observer level, you can run 100,000 before failing
     while True:
         random.seed(time.time())
         random.shuffle(arr)

@@ -1,11 +1,11 @@
 # Optimizing ONEST
 
-All times are, unless otherwise noted, tested using the `assisted.csv` dataset and calculated with 10 surfaces
+All times are, unless otherwise noted, tested using the `assisted.csv` dataset unless otherwise noted.
 
 ## `match` Function
 These were run single-threaded
 
-### Pandas
+## Pandas
 I think this is really invalid because the `assisted.csv` file had the ground truth values which likely screwed things up.
 
 | Version Name      | Time (s)          |
@@ -17,7 +17,7 @@ I think this is really invalid because the `assisted.csv` file had the ground tr
 | all(first == x)    | 626.909182548523  |
 | set length        | 630.9581050872803 |
 
-### NumPy
+## NumPy
 For 10 surfaces:
 | Version Name      | Time (s)           |
 | ----------------- | ------------------ |
@@ -40,7 +40,7 @@ For 1000 surfaces:
 | early quit        | 596.1405961513519 |
 | itertools groupby | 612.1813862323761 |
 
-### The Versions
+## The Versions
 
 - early quit
     ```python
@@ -82,7 +82,45 @@ For 1000 surfaces:
     return len(set(match_list)) == 1
     ```
 
-## Multithreading
+# `random_unique_permutations` Function
+
+| # of Curves | Method                   | User Time  | Fails |
+| ----------- | ------------------------ | ---------- | ----- |
+| 100,000     | `random` unchecked       | 8m9.004s   | N/A   |
+| 100,000     | `random` with `in` check | 13m25.277s | 0     |
+
+## The Methods
+
+- `random` unchecked
+    ```python
+    import random, time
+    ----------
+    while True:
+        random.seed(time.time())
+        random.shuffle(arr)
+        yield arr
+    ```
+
+- `random` with `in` check:
+    ```python
+    import random, time
+    fail = []
+    ----------
+    prev = []
+    while True:
+        random.seed(time.time())
+        random.shuffle(arr)
+
+        while list(arr) in prev:
+            fail.append(1)
+            random.seed(time.time())
+            random.shuffle(arr)
+        prev.append(list(arr))
+
+        yield arr
+    ```
+
+# Multithreading
 Using `early quite` for `match`. Multithreaded at the surface level (i.e. 10 seperate tasks generated). Single- and multi-threaded for 1000 surfaces used `unassisted.csv` and `assisted.csv` respectively so I could have each cached with 1000 surfaces.
 
 | Level   | # of Surfaces | Threading    | Time (s)            |
