@@ -32,7 +32,7 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
 # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
 parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
-parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
+parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels", nargs="*")
 parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
 
 args = parser.parse_args()
@@ -159,12 +159,11 @@ def onest(
     return np.array(onest, copy=False)
 
 
-args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts)[:, :20] for set in args.dataset_names])
-
-datasets_from_cache = [".pkl", ".npy"] in file_exts
+args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
+datasets_from_cache = any(ext in file_exts for ext in [".pkl", ".npy"])
 
 if args.model == "onest":
-    unique_curves = 10000
+    unique_curves = 1000
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     if not datasets_from_cache:
         counter = 0
@@ -175,16 +174,15 @@ if args.model == "onest":
             onest_analyses.append(analysis)
 
             if args.cache:
-                # TODO: Need to encode certain information in args such as if -d is flagged
                 np.save(file_names[counter] + ".npy", analysis)
                 counter += 1
         onest_analyses = np.asarray(onest_analyses)
+        # pyplot.Axes.plot calls for observers to be last
         onest_analyses = np.transpose(onest_analyses, (0, 2, 1))
     
     else:
         onest_analyses = args.datasets
 
-    # ! put this in numpy terms
     if args.describe:
         # Desribe as min, mean, max if desired
         onest_curves = np.dstack((
@@ -212,30 +210,33 @@ if args.model == "onest":
     # adjust plot parameters
     ax.xaxis.set_major_locator(MultipleLocator(6))
     ax.xaxis.set_major_formatter('{x:.0f}')
+    # should have 3+ observers or this errors
     ax.set_xlim(*obs_range)
     ax.set_xlabel("Number of Observers")
     ax.set_ylim(0, 1)
     ax.set_ylabel("Overall Proportion Agreement")
     ax.legend(ax.get_lines()[::(3 if args.describe else unique_curves)],
               args.labels if args.labels != None else file_names)
-
-    # plt.show()
+    plt.savefig(
+        "./results/onest_2class.png",
+        bbox_inches="tight",
+        transparent=False,
+        dpi=1000
+    )
+    plt.show()
 
 elif args.model == "sarape":
-    # Run ONEST with S observers and C cases (for each cell in [observers_axis x cases_axis])
+    # Calculate model for each dataset
     if not datasets_from_cache:
         counter = 0
         case_onest_analyses: list[np.ndarray] = []
         unique_surfaces = 1000
 
         for cases_x_observers_matrix in args.datasets:
-            # start = time.time()
             single_analysis = sarape(
-                np.transpose(cases_x_observers_matrix), 
+                np.transpose(cases_x_observers_matrix),
                 unique_surfaces
             )
-            # end = time.time()
-            # print("ONEST calculation time:", end - start)
 
             if args.cache:
                 np.save(file_names[counter], np.asarray(single_analysis))
@@ -247,6 +248,7 @@ elif args.model == "sarape":
     else:
         case_onest_analyses = args.datasets
 
+    ## Description
     if args.describe:
         # Get min and max
         dataset_surfaces = []
@@ -260,23 +262,26 @@ elif args.model == "sarape":
     else:
         dataset_surfaces = case_onest_analyses
 
+
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    colors = ["coolwarm", "PiYG"]
+    colors = ["PiYG", "coolwarm"]
     obs_range = (2, dataset_surfaces.shape[3] + 1)
     observers_axis = np.arange(obs_range[0], obs_range[1] + 1)
     cases_range = (1, dataset_surfaces.shape[2])
     cases_axis = np.arange(cases_range[0], cases_range[1] + 1)
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
-    # Plot the surface
 
-    for dataset in range(dataset_surfaces.shape[0]):
-        for surface in dataset_surfaces[dataset]:
+    ## Plot
+    # We have to draw things backwards to get them layered better
+    for dataset in range(dataset_surfaces.shape[0] - 1, -1, -1):
+        for surface in dataset_surfaces[dataset, ::-1]:
             ax.plot_surface(
                 observers_axis, cases_axis,
                 surface,
                 cmap=colors[dataset % len(colors)],
                 linewidth=0, 
-                antialiased=False
+                antialiased=False,
+                zsort="max"
             )
 
     # Customize the z axis.
@@ -291,5 +296,11 @@ elif args.model == "sarape":
 
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter('{x:.02f}')
-
+    ax.view_init(azim=45, elev=30)
+    plt.savefig(
+        "./results/sarape.png", 
+        bbox_inches="tight", 
+        transparent=False,
+        dpi=1000
+    )
     plt.show()
