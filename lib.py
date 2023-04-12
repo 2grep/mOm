@@ -5,10 +5,15 @@ from collections import deque
 import typing as typ
 import time
 
+## Type Variables ##
+T = typ.TypeVar('T')
+
+## Functions ##
+
 def bucket(
         dataset: np.ndarray, 
         num_buckets: int, 
-        range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)
+        range: typ.Union[tuple[int, int], list[int]] = (0, 1)
     ) -> np.ndarray:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
@@ -46,7 +51,8 @@ def rotate(
 def data_reader(
         fname: str,
         names: list[str] = [],
-        exts: list[str] = []):
+        exts: list[str] = []
+    ) -> np.ndarray:
     '''
     Read in data from file.
     Appends file names and extensions to names and exts repectively if specified.
@@ -61,11 +67,11 @@ def data_reader(
     elif fext == ".csv":
         data = np.loadtxt(fname, delimiter=",")
         return data
+    raise Exception(f"{fext} is an unrecognized file extension for `fname`.")
 
 def random_unique_permutations(
-        arr: list, 
-        max_choices: int = -2
-    ) -> typ.Generator[list, None, None]:
+            arr: typ.MutableSequence[typ.Type[T]]
+    ) -> typ.Generator[typ.MutableSequence[typ.Type[T]], None, None]:
     '''
     Generate random, unique permutations of arr upto max_choices number of values.
 
@@ -86,9 +92,7 @@ def random_unique_permutations(
         random.shuffle(arr)
         yield arr
 
-def match(
-        match_list: list
-    ) -> bool:
+def match(match_list: typ.Iterable) -> bool:
     '''
     Check if all in `match_list` are the same value
     '''

@@ -39,7 +39,7 @@ args = parser.parse_args()
 
 file_names = []
 file_exts = []
-args.datasets = [lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names]
+args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
 
 datasets_from_cache = [".pkl", ".npy"] in file_exts
 
@@ -47,9 +47,7 @@ datasets_from_cache = [".pkl", ".npy"] in file_exts
 # Written in the style of David Jin wrote these, originally here:
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
-def overall_proportion_agreement(
-        case_observer_matrix: np.ndarray
-    ) -> float:
+def overall_proportion_agreement(case_observer_matrix: np.ndarray) -> float:
     '''
     Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
 
@@ -62,9 +60,7 @@ def overall_proportion_agreement(
 
 def sarape(
         case_observer_matrix: np.ndarray, 
-        unique_surfaces: int, 
-        max_observers: int,
-        max_cases: int
+        unique_surfaces: int
     ) -> np.ndarray:
     # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
@@ -82,22 +78,20 @@ def sarape(
     unique_surfaces : number of surfaces to run
         More surfaces is a better sample of the full space but takes longer. However, this MUST be less 
         than `min(case_observer_matrix.shape)!` or this will enter an infinite loop; we do NOT check for this.
-    max_observers, max_cases : a maximum limit to the number of observers/cases to use in each surface
-        will use the minimum of this and respective axis shape of case_observer_matrix
     
     Returns
     -------
-    sarape : surfaces calculated as shape `(unique_surfaces, cases, observers - 1)`
+    sarape : surfaces calculated with a shape of `(unique surfaces, cases, total observers - 1)`
     '''
     # Generators for observers and cases
 
     num_obs = case_observer_matrix.shape[0]
     num_cases = case_observer_matrix.shape[1]
-    obs_gen = lib.random_unique_permutations(np.arange(num_obs), max_observers)
-    cases_gen = lib.random_unique_permutations(np.arange(num_cases), max_cases)
+    obs_gen = lib.random_unique_permutations(np.arange(num_obs))
+    cases_gen = lib.random_unique_permutations(np.arange(num_cases))
 
     space = []
-    for new_surface in np.arange(unique_surfaces):
+    for new_surface in range(unique_surfaces):
         if new_surface % 10 == 0:
             print("Running surface:", new_surface)
 
@@ -105,7 +99,7 @@ def sarape(
         surf_cases = next(cases_gen)
 
         # cases x observers
-        opa_grid = []
+        grid = []
         for case_ind in range(num_cases):
             reduced_cases = surf_cases[:case_ind + 1]
 
@@ -118,8 +112,8 @@ def sarape(
                 opa = overall_proportion_agreement(matrix)
 
                 observer_opas.append(opa)
-            opa_grid.append(observer_opas)
-        space.append(opa_grid)
+            grid.append(observer_opas)
+        space.append(grid)
     return np.array(space, copy=False)
 
 def onest(
@@ -228,54 +222,29 @@ if args.model == "onest":
     plt.show()
 
 elif args.model == "sarape":
-    # observers_min = args.datasets[0].index[0]
-    # observers_max = args.datasets[0].index[-1]
-    observers_min = 2
-    observers_max = 20
-    observers_axis = np.arange(observers_min, observers_max + 1)
-    cases_min = 1
-    # cases_max = len(args.datasets[0].columns)
-    cases_max = 240
-    cases_axis = np.arange(cases_min, cases_max + 1)
-    # TODO: Double check this returns row x column
-    observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
-
     # Run ONEST with S observers and C cases (for each cell in [observers_axis x cases_axis])
-    case_onest_analyses = []
-    counter = 0
     if not datasets_from_cache:
-        for cases_x_observers_matrix in args.datasets:
-            # Get case x observer bounds
-            unique_surfaces = 1000
-            # idk if this is the right order
-            max_num_observers = cases_x_observers_matrix.shape[0]
-            max_num_cases = cases_x_observers_matrix.shape[1]
+        counter = 0
+        case_onest_analyses: list[np.ndarray] = []
+        unique_surfaces = 10
 
-            start = time.time()
+        for cases_x_observers_matrix in args.datasets:
+            # start = time.time()
             single_analysis = sarape(
                 np.transpose(cases_x_observers_matrix), 
-                unique_surfaces, 
-                max_num_cases, 
-                max_num_observers
+                unique_surfaces
             )
-            end = time.time()
-            print("ONEST calculation time:", end - start)
-
-            case_onest_analyses.append(single_analysis)
+            # end = time.time()
+            # print("ONEST calculation time:", end - start)
 
             if args.cache:
                 np.save(file_names[counter], np.asarray(single_analysis))
                 counter += 1
 
-        # case_onest_analyes = ndarry
-        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
-        #                    = (datasets, surfaces, cases, observers - 1)
+            case_onest_analyses.append(single_analysis)
         case_onest_analyses = np.asarray(case_onest_analyses)
 
     else:
-        # case_onest_analyes = list of ndarrys
-        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
-        #                    = (datasets, surfaces, cases, observers - 1)
         case_onest_analyses = args.datasets
 
     if args.describe:
@@ -289,19 +258,23 @@ elif args.model == "sarape":
         dataset_surfaces = np.asarray(dataset_surfaces)
     
     else:
-        dataset_surfaces = np.asarray(case_onest_analyses)
+        dataset_surfaces = case_onest_analyses
 
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    # Plot the surface
     colors = ["coolwarm", "PiYG"]
+    obs_range = (2, dataset_surfaces.shape[3] + 1)
+    observers_axis = np.arange(obs_range[0], obs_range[1] + 1)
+    cases_range = (1, dataset_surfaces.shape[2])
+    cases_axis = np.arange(cases_range[0], cases_range[1] + 1)
+    observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
+    # Plot the surface
 
     print(dataset_surfaces.shape)
-    for dataset in np.arange(dataset_surfaces.shape[0]):
+    for dataset in range(dataset_surfaces.shape[0]):
         for surface in dataset_surfaces[dataset]:
             ax.plot_surface(
-                observers_axis, 
-                cases_axis, 
-                surface, 
+                observers_axis, cases_axis,
+                surface,
                 cmap=colors[dataset % len(colors)],
                 linewidth=0, 
                 antialiased=False
@@ -310,9 +283,9 @@ elif args.model == "sarape":
     # Customize the z axis.
     ax.xaxis.set_major_locator(MultipleLocator(6))
     ax.xaxis.set_major_formatter('{x:.0f}')
-    ax.set_xlim(2, 20)
+    ax.set_xlim(*obs_range)
     ax.set_xlabel("Number of Observers")
-    ax.set_ylim([1, 240])
+    ax.set_ylim(*cases_range)
     ax.set_ylabel("Number of Cases")
     ax.set_zlim(0, 1)
     ax.set_zlabel("Overall Proportion Agreement")
@@ -320,4 +293,4 @@ elif args.model == "sarape":
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter('{x:.02f}')
 
-    # plt.show()
+    plt.show()
