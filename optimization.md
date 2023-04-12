@@ -53,16 +53,22 @@ For 1000 surfaces:
 
 - numpy all equals
     ```python
+    import numpy as np
+    ------------------
     return np.all(match_list == match_list[0])
     ```
 
 - functools reduce
     ```python
+    import fuctools, operator
+    ----------------
     return functools.reduce(operator.eq, match_list)
     ```
 
 - itertools groupby
     ```python
+    import functools
+    ----------------
     g = itertools.groupby(match_list)
     return next(g, True) and not next(g, False)
     ```
@@ -84,17 +90,63 @@ For 1000 surfaces:
 
 # `random_unique_permutations` Function
 
-| # of Curves | Method                   | User Time  | Fails |
-| ----------- | ------------------------ | ---------- | ----- |
-| 100,000     | `random` unchecked       | 8m9.004s   | N/A   |
-| 100,000     | `random` with `in` check | 13m25.277s | 0     |
+These are all computed with 20 observers in the ONEST method and the early quit method for `match`
+
+### Timing
+
+| #  | # of Curves | Method                                   | User Time  | Fails |
+| -- | ----------- | ---------------------------------------- | ---------- | ----- |
+| 1  | 1,000       | `random` unchecked                       | 0m6.407s   | N/A   |
+| 2  | 1,000       | `random` with `in` check                 | 0m7.005s   | 0     |
+| 3  | 1,000       | `numpy.random.Generator` unchecked       | 0m6.116s   | N/A   |
+| 4  | 1,000       | `numpy.random.Generator` with `in` check | 0m6.447s   | 0     |
+| 5  | 10,000      | `random` unchecked                       | 0m50.399s  | N/A   |
+| 6  | 10,000      | `random` with `in` check                 | 0m51.152s  | 0     |
+| 7  | 10,000      | `numpy.random.Generator` unchecked       | 0m49.310s  | N/A   |
+| 8  | 10,000      | `numpy.random.Generator` with `in` check | 0m52.156s  | 0     |
+| 9  | 100,000     | `random` unchecked                       | 8m9.004s   | N/A   |
+| 10 | 100,000     | `random` with `in` check                 | 13m25.277s | 0     |
+| 11 | 100,000     | `numpy.random.Generator` unchecked       | 8m5.589s   | N/A   |
+| 12 | 100,000     | `numpy.random.Generator` with `in` check | 13m19.908s | 0     |
+
+(9) to (10) is a 64.7% increase in time.
+(9) to (11) is a 0.69% decrease in time.
+(10) to (12) is a 0.67% decrease in time.
+(11) to (12) is 64.7% inccrease in time
+
+### Counting Fails
+
+These tests are run with the `numpy.random.Generator` with `in` check method and 10000 curves. First fail is indexed starting at 1.
+
+| # of Observers | Potential Permutations (Observers!) | First Fail | # of Fails | % Fail |
+| -------------- | ------------------------------------| ---------- | ---------- | ------ |
+| 1              | 1                                   | 2          | 9999       | 99.99% |
+| 2              | 2                                   | 3          | 9998       | 99.98% |
+| 3              | 6                                   | 4          | 9994       | 99.9%  |
+| 4              | 24                                  | 5          | 9976       | 99.8%  |
+| 5              | 125                                 | 19         | 9880       | 98.8%  |
+| 6              | 720                                 | 34         | 9280       | 92.8%  |
+| 7              | 5040                                | 148        | 5664       | 56.6%  |
+| 8              | 40320                               | 650        | 1157       | 11.6%  |
+| 9              | 362880                              | 1049       | 140        | 14%    |
+| 10             | 3.63e+6                             | 3010       | 14         | 14%    |
+| 11             | 3.99e+7                             | 5145       | 2          | 2%     |
+| 12             | 4.79e+8                             | N/A        | 0          | 0%     |
+| 13             | 6.23e+9                             | N/A        | 0          | 0%     |
+| 14             | 8.72e+10                            | N/A        | 0          | 0%     |
+| 15             | 1.31e+12                            | N/A        | 0          | 0%     |
+| 16             | 2.09e+13                            | N/A        | 0          | 0%     |
+| 17             | 3.56e+14                            | N/A        | 0          | 0%     |
+| 18             | 6.40e+15                            | N/A        | 0          | 0%     |
+| 19             | 1.22e+17                            | N/A        | 0          | 0%     |
+| 20             | 2.43e+18                            | N/A        | 0          | 0%     |
 
 ## The Methods
 
 - `random` unchecked
     ```python
     import random, time
-    ----------
+    --------------------
     while True:
         random.seed(time.time())
         random.shuffle(arr)
@@ -105,17 +157,44 @@ For 1000 surfaces:
     ```python
     import random, time
     fail = []
-    ----------
+    --------------------
     prev = []
     while True:
         random.seed(time.time())
         random.shuffle(arr)
 
-        while list(arr) in prev:
+        arrlist = list(arr)
+        if arrlist in prev:
             fail.append(1)
-            random.seed(time.time())
-            random.shuffle(arr)
-        prev.append(list(arr))
+        prev.append(arrlist)
+
+        yield arr
+    ```
+
+- `numpy.random.Generator` unchecked
+    ```python
+    import numpy.random as random
+    ------------------------------
+    rng = random.default_rng()
+    while True:
+        rng.shuffle(arr)
+        yield arr
+    ```
+
+- `numpy.random.Generator` with `in` check
+    ```python
+    import numpy.random as random
+    fail = []
+    ------------------------------
+    rng = random.default_rng()
+    prev = []
+    while True:
+        rng.shuffle(arr)
+
+        arrlist = list(arr)
+        if arrlist in prev:
+            fail.append(1)
+        prev.append(arrlist)
 
         yield arr
     ```

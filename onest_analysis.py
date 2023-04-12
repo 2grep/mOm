@@ -39,9 +39,6 @@ args = parser.parse_args()
 
 file_names = []
 file_exts = []
-args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
-
-datasets_from_cache = [".pkl", ".npy"] in file_exts
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here:
@@ -49,7 +46,8 @@ datasets_from_cache = [".pkl", ".npy"] in file_exts
 
 def overall_proportion_agreement(case_observer_matrix: np.ndarray) -> float:
     '''
-    Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
+    Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and 
+    returns a measure of the overall agreement for observers.
 
     Assumes observers are in first dimension
     '''
@@ -64,7 +62,8 @@ def sarape(
     ) -> np.ndarray:
     # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
-    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from the full space of samples. 
+    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from
+    the full space of samples. 
 
     Parameters
     ----------
@@ -76,9 +75,9 @@ def sarape(
          [O0, O1, ..., Oc]]
         ```
     unique_surfaces : number of surfaces to run
-        More surfaces is a better sample of the full space but takes longer. However, this MUST be less 
-        than `min(case_observer_matrix.shape)!` or this will enter an infinite loop; we do NOT check for this.
-        TODO: check if we are still entering infite loop. Really just need to better study `lib.random_unique_permutations`
+        More surfaces is a better sample of the full space but takes longer. "Unique" meaning the orders 
+        of rows and columns of case_observer_matrix are independently (i.e. uniqueness in row is unrelated
+        to that of columns) unique orderings.
     
     Returns
     -------
@@ -139,8 +138,7 @@ def onest(
     '''
     onest = []
     num_obs = case_observer_matrix.shape[0]
-    fuck = []
-    observers_generator = lib.random_unique_permutations(np.arange(num_obs), fuck)
+    observers_generator = lib.random_unique_permutations(np.arange(num_obs))
 
     for new_curve in range(unique_curves):
         if new_curve % 10 == 0:
@@ -158,11 +156,15 @@ def onest(
             curve.append(opa)
 
         onest.append(curve)
-    print(len(fuck))
     return np.array(onest, copy=False)
 
+
+args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts)[:, :20] for set in args.dataset_names])
+
+datasets_from_cache = [".pkl", ".npy"] in file_exts
+
 if args.model == "onest":
-    unique_curves = 100000
+    unique_curves = 10000
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     if not datasets_from_cache:
         counter = 0

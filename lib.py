@@ -1,6 +1,6 @@
 import os
 # TODO: use numpy.random.Generator for shuffling
-import random as random
+import numpy.random as random
 import numpy as np
 from collections import deque
 import typing as typ
@@ -74,7 +74,7 @@ def random_unique_permutations(
         arr: typ.MutableSequence[typ.Type[T]]
     ) -> typ.Generator[typ.MutableSequence[typ.Type[T]], None, None]:
     '''
-    Generate random, unique permutations of arr upto max_choices number of values.
+    Generate random, unique (i.e. will never return sequences with the exact same order) permutations of arr.
 
     Effectively computes `len(seq)` choose `max_choices` permutations.
 
@@ -88,10 +88,11 @@ def random_unique_permutations(
     random_unique_permutations : a new random, unique permutation of seq 
     '''
     # TODO: This is not truly unique and quickly fails for smaller numbers of observers. 
-    # * However, at the 20 observer level, you can run 100,000 before failing
+    # However, at the 20 observer level, you can run at least 100,000 before failing
+    # rng = random.default_rng()
+    rng = random.default_rng()
     while True:
-        random.seed(time.time())
-        random.shuffle(arr)
+        rng.shuffle(arr)
         yield arr
 
 def match(match_list: typ.Iterable) -> bool:
