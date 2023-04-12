@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import time
 import lib
-import typing as typ
 
 # TODO: convert from pandas DataFrames to NumPy nd_arrays for ALL calculations
 
@@ -67,8 +66,9 @@ def sarape(
         max_observers: int,
         max_cases: int
     ) -> np.ndarray:
+    # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
-    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from the full space of samples
+    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from the full space of samples. 
 
     Parameters
     ----------
@@ -161,7 +161,6 @@ def onest(
         onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
     return onest
 
-
 if args.model == "onest":
     unique_curves = 100
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
@@ -229,9 +228,6 @@ if args.model == "onest":
     plt.show()
 
 elif args.model == "sarape":
-    # TODO: adjust this to work with both cached and uncached data
-    # - NumPy ndarray (aka. just go all in on numpy); more overhead in flipping around the data but full consistency
-
     # observers_min = args.datasets[0].index[0]
     # observers_max = args.datasets[0].index[-1]
     observers_min = 2
@@ -241,21 +237,27 @@ elif args.model == "sarape":
     # cases_max = len(args.datasets[0].columns)
     cases_max = 240
     cases_axis = np.arange(cases_min, cases_max + 1)
+    # TODO: Double check this returns row x column
     observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
 
-    # Run ONEST with O observers and C cases (for each cell in [observers_axis x cases_axis])
+    # Run ONEST with S observers and C cases (for each cell in [observers_axis x cases_axis])
     case_onest_analyses = []
     counter = 0
     if not datasets_from_cache:
         for cases_x_observers_matrix in args.datasets:
             # Get case x observer bounds
             unique_surfaces = 1000
-            max_num_cases = cases_x_observers_matrix.shape[0]
-            max_num_observers = cases_x_observers_matrix.shape[1]
+            # idk if this is the right order
+            max_num_observers = cases_x_observers_matrix.shape[0]
+            max_num_cases = cases_x_observers_matrix.shape[1]
 
             start = time.time()
             single_analysis = sarape(
-                np.transpose(cases_x_observers_matrix), unique_surfaces, max_num_cases, max_num_observers)
+                np.transpose(cases_x_observers_matrix), 
+                unique_surfaces, 
+                max_num_cases, 
+                max_num_observers
+            )
             end = time.time()
             print("ONEST calculation time:", end - start)
 
@@ -301,7 +303,7 @@ elif args.model == "sarape":
                 cases_axis, 
                 surface, 
                 cmap=colors[dataset % len(colors)],
-                inewidth=0, 
+                linewidth=0, 
                 antialiased=False
             )
 
@@ -318,4 +320,4 @@ elif args.model == "sarape":
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter('{x:.02f}')
 
-    plt.show()
+    # plt.show()

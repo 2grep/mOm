@@ -3,6 +3,7 @@ import random
 import numpy as np
 from collections import deque
 import typing as typ
+import time
 
 def bucket(
         dataset: np.ndarray, 
@@ -12,8 +13,9 @@ def bucket(
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
     (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
+    Basically just numpy.histogram but makes sure the bins are always the same
 
-    range is exclusive on the right except the last bucket which is inclusive on both sides
+    range is exclusive on the right except the last bucket which is inclusive on both sides.
     '''
     spacer = (range[1] - range[0]) / num_buckets
     return np.apply_along_axis(
@@ -29,6 +31,7 @@ def bucket(
         dataset
     )
 
+# TODO: I think this is deprecated. If so, get rid of it; if not, compare deque to list for rotating
 def rotate(
         arr: np.ndarray, 
         num: int
@@ -39,7 +42,6 @@ def rotate(
     ind = deque(np.arange(0, len(arr.shape)))
     ind.rotate(num)
     return np.transpose(arr, ind)
-
 
 def data_reader(
         fname: str,
@@ -61,33 +63,37 @@ def data_reader(
         return data
 
 def random_unique_permutations(
-        arr: typ.MutableSequence, 
+        arr: list, 
         max_choices: int = -2
-    ) -> typ.Generator[typ.MutableSequence, None, None]:
+    ) -> typ.Generator[list, None, None]:
     '''
     Generate random, unique permutations of arr upto max_choices number of values.
-    WILL enter infinite loop if called more than len(arr)! times. We do NOT check for this.
+
+    Effectively computes `len(seq)` choose `max_choices` permutations.
+
+    Parameters
+    ----------
+    seq : sequence to permute
+    max_choices : maximum number of choices to pull from each permutation
+
+    Yields
+    ------
+    random_unique_permutations : a new random, unique permutation of seq 
     '''
-    max_choices += 1
-    prev_permutations = []
+    # TODO: check that this really is unique
     while True:
+        random.seed(time.time())
         random.shuffle(arr)
-        new_permutation = arr[:max_choices]
-        while new_permutation in prev_permutations:
-            random.shuffle(arr)
-            new_permutation = arr[:max_choices]
-
-        yield new_permutation
-
+        yield arr
 
 def match(
-        arr: typ.Sequence
+        match_list: list
     ) -> bool:
     '''
-    Check if all in `arr` are the same value
+    Check if all in `match_list` are the same value
     '''
-    first = arr[0]
-    for item in arr:
-        if first != item:
+    first = match_list[0]
+    for item in match_list[1:]:
+        if item != first:
             return False
     return True

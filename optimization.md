@@ -5,6 +5,9 @@ All times are, unless otherwise noted, tested using the `assisted.csv` dataset a
 ## `match` Function
 These were run single-threaded
 
+### Pandas
+I think this is really invalid because the `assisted.csv` file had the ground truth values which likely screwed things up.
+
 | Version Name      | Time (s)          |
 | ----------------- | ----------------- |
 | early quit        | 68.40768909454346 |
@@ -14,34 +17,59 @@ These were run single-threaded
 | all(first == x)    | 626.909182548523  |
 | set length        | 630.9581050872803 |
 
+### NumPy
+For 10 surfaces:
+| Version Name      | Time (s)           |
+| ----------------- | ------------------ |
+| early quit        | 6.089831829071045  |
+| numpy all equals  | 15.421066045761108 |
+| functools reduce  | 44.58276987075806  |
+| itertools groupby | 6.2754082679748535 |
+| all(first == x)    | 7.123004913330078  |
+| set length        | 7.707198143005371  |
+
+For 100 surfaces:
+| Version Name      | Time (s)          |
+| ----------------- | ----------------- |
+| early quit        | 61.479896068573   |
+| itertools groupby | 61.39276599884033 |
+
+For 1000 surfaces:
+| Version Name      | Time (s)          |
+| ----------------- | ----------------- |
+| early quit        | 596.1405961513519 |
+| itertools groupby | 612.1813862323761 |
+
+### The Versions
+
 - early quit
     ```python
-    first = case[observers[0]]
-    for observer in observers[1:len(observers)]:
-        if case[observer] != first:
-            return 0
-    return 1
+    first = match_list[0]
+    for item in match_list[1:]:
+        if item != first:
+            return False
+    return True
     ```
 
 - numpy all equals
     ```python
-    return int(np.all(case[observers] == case[observers[0]]))
+    return np.all(match_list == match_list[0])
     ```
 
 - functools reduce
     ```python
-    return functools.reduce(operator.eq, case[observers])
+    return functools.reduce(operator.eq, match_list)
     ```
 
 - itertools groupby
     ```python
-    g = itertools.groupby(case[observers])
+    g = itertools.groupby(match_list)
     return next(g, True) and not next(g, False)
     ```
 
 - all(first == x)
     ```python
-    iterator = iter(case[observers])
+    iterator = iter(match_list)
     try:
         first = next(iterator)
     except StopIteration:
@@ -51,7 +79,7 @@ These were run single-threaded
 
 - set length
     ```python
-    return len(set(case[observers])) == 1
+    return len(set(match_list)) == 1
     ```
 
 ## Multithreading
