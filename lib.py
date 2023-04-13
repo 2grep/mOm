@@ -106,11 +106,11 @@ def random_unique_permutations(
         while True:
             rng.shuffle(arr)
 
-            hashseq = arr.data.tobytes()
-            while hashseq in prev:
+            hasharr = arr.data.tobytes()
+            while hasharr in prev:
                 rng.shuffle(arr)
-                hashseq = arr.data.tobytes()
-            prev_add(hashseq)
+                hasharr = arr.data.tobytes()
+            prev_add(hasharr)
 
             yield arr
     else:
