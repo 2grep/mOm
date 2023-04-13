@@ -53,8 +53,10 @@ def run_ridge(
     np.savetxt(fname + ("" if ".csv" == fname[-4:] else ".csv"), ridge, fmt="%d", delimiter=",")
     return ridge
 
+
 # TODO: refactor to calculate these datasets more simply - this requires simplifying onest_analysis.py
-dataset_names = ["./data/assisted_2class.npy", "./data/unassisted_2class.npy"]
+dataset_names = ["./data/nottingham/nottingham.npy",
+                 "./data/nottingham/tubulus.npy"]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-run_ridge(datasets, fname="./results/ridge_2class")
+run_ridge(datasets, fname="./results/nottingham/ridge")

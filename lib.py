@@ -1,3 +1,4 @@
+import math
 import os
 # TODO: use numpy.random.Generator for shuffling
 import numpy.random as random
@@ -71,29 +72,60 @@ def data_reader(
     raise Exception(f"{fext} is an unrecognized file extension for `fname`.")
 
 def random_unique_permutations(
-        arr: typ.MutableSequence[typ.Type[T]]
-    ) -> typ.Generator[typ.MutableSequence[typ.Type[T]], None, None]:
+    arr: np.ndarray,
+    call_count: int = None
+) -> typ.Generator[np.ndarray, None, None]:
     '''
-    Generate random, unique (i.e. will never return sequences with the exact same order) permutations of arr.
-
-    Effectively computes `len(seq)` choose `max_choices` permutations.
+    Generate random, unique (i.e. will never return sequences with the exact same order) 
+    permutations of arr.
 
     Parameters
     ----------
-    seq : sequence to permute
-    max_choices : maximum number of choices to pull from each permutation
+    arr : array to permute
+    call_count : number of times `next` will be called
+        If supplied, improves performance by not having to check with every call 
+        but may enter infite loop if `next` is called more than `call_count` times.
 
     Yields
     ------
     random_unique_permutations : a new random, unique permutation of seq 
+
+    Raises
+    ------
+    AssertException : `call_count` is greater than `len(arr)` factorial 
+        (i.e. will call more than the number of possible permutations).
+    AssertException : `next` called more times than `len(arr)!` 
+        (`call_count == None`)
     '''
-    # TODO: This is not truly unique and quickly fails for smaller numbers of observers. 
-    # However, at the 20 observer level, you can run at least 100,000 before failing
-    # rng = random.default_rng()
     rng = random.default_rng()
-    while True:
-        rng.shuffle(arr)
-        yield arr
+    prev = set()
+    prev_add = prev.add
+    max = math.factorial(len(arr))
+    if call_count != None:
+        assert call_count <= max, "Cannot generate more unique permutations than exist"
+        while True:
+            rng.shuffle(arr)
+
+            hashseq = arr.data.tobytes()
+            while hashseq in prev:
+                rng.shuffle(arr)
+                hashseq = arr.data.tobytes()
+            prev_add(hashseq)
+
+            yield arr
+    else:
+        while True:
+            assert len(prev) != max, "Cannot get more unique permutations than exist"
+
+            rng.shuffle(arr)
+
+            hashseq = arr.data.tobytes()
+            while hashseq in prev:
+                rng.shuffle(arr)
+                hashseq = arr.data.tobytes()
+            prev_add(hashseq)
+
+            yield arr
 
 def match(match_list: typ.Iterable) -> bool:
     '''

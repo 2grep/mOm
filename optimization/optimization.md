@@ -108,6 +108,7 @@ These are all computed with 20 observers in the ONEST method and the early quit 
 | 10 | 100,000     | `random` with `in` check                 | 13m25.277s | 0     |
 | 11 | 100,000     | `numpy.random.Generator` unchecked       | 8m5.589s   | N/A   |
 | 12 | 100,000     | `numpy.random.Generator` with `in` check | 13m19.908s | 0     |
+| 13 | 100,000     | set check                                | 8m5.902s   | N/A   |
 
 (9) to (10) is a 64.7% increase in time.
 (9) to (11) is a 0.69% decrease in time.
@@ -195,6 +196,32 @@ These tests are run with the `numpy.random.Generator` with `in` check method and
         if arrlist in prev:
             fail.append(1)
         prev.append(arrlist)
+
+        yield arr
+    ```
+
+- set check
+    ```python
+    import numpy.random as random
+    import numpy as np
+    import math
+    arr: np.ndarray
+    # proposed number of times `next` will be called
+    count: int
+    ------------------------------
+    rng = random.default_rng()
+    prev = set()
+    prev_add = prev.add
+    max = math.factorial(len(arr))
+    assert count >= max, "Cannot generate more unique permutations than exist."
+    while True:
+        rng.shuffle(arr)
+
+        hasharr = arr.data.tobytes()
+        while hasharr in prev:
+            rng.shuffle(arr)
+            hasharr = arr.data.tobytes()
+        prev_add(hasharr)
 
         yield arr
     ```

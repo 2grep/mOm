@@ -98,10 +98,10 @@ def run_ridge(
 
     np.savetxt("ridge.csv", ridge, fmt="%d", delimiter=",")
 
-exp = "prostate_reader/"
-group = "_5class"
-dataset_names = ["./data/" + exp +   "assisted" + group + ".npy",
-                 "./data/" + exp + "unassisted" + group + ".npy"
+exp = "nottingham/"
+group = ""
+dataset_names = ["./data/" + exp + "nottingham" + group + ".npy",
+                 "./data/" + exp + "tubulus" + group + ".npy"
                  ]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
@@ -172,14 +172,20 @@ for obs in range(num_obs):
         labelbottom=True
     )
     ax.set_xlabel(obs + 2)
+plt.tight_layout()
 
-fig.text(.088, .35, "Overall Proportion Agreement", 
+fig.text(0, .5, "Overall Proportion Agreement", 
          rotation="vertical",
-         size="xx-large"
+         size="xx-large",
+         horizontalalignment="center",
+         verticalalignment="center",
         )
-fig.text(.45, .06, "Number of Observers", 
+fig.text(.5, 0, "Number of Observers", 
          rotation="horizontal",
-         size="xx-large")
+         size="xx-large",
+         horizontalalignment="center",
+         verticalalignment="center",
+         )
 
 plt.savefig("./results/" + exp + "hist" + group + ".png",
             bbox_inches="tight", transparent=False, dpi=100)

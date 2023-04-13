@@ -87,8 +87,8 @@ def sarape(
 
     num_obs = case_observer_matrix.shape[0]
     num_cases = case_observer_matrix.shape[1]
-    obs_gen = lib.random_unique_permutations(np.arange(num_obs))
-    cases_gen = lib.random_unique_permutations(np.arange(num_cases))
+    obs_gen = lib.random_unique_permutations(np.arange(num_obs), call_count=unique_surfaces)
+    cases_gen = lib.random_unique_permutations(np.arange(num_cases), call_count=unique_surfaces)
 
     space = []
     for new_surface in range(unique_surfaces):
@@ -218,7 +218,7 @@ if args.model == "onest":
     ax.legend(ax.get_lines()[::(3 if args.describe else unique_curves)],
               args.labels if args.labels != None else file_names)
     plt.savefig(
-        "./results/onest_2class.png",
+        "./results/onest.png",
         bbox_inches="tight",
         transparent=False,
         dpi=1000
@@ -264,7 +264,7 @@ elif args.model == "sarape":
 
 
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    colors = ["PiYG", "coolwarm"]
+    colors = ["coolwarm", "PiYG"]
     obs_range = (2, dataset_surfaces.shape[3] + 1)
     observers_axis = np.arange(obs_range[0], obs_range[1] + 1)
     cases_range = (1, dataset_surfaces.shape[2])
