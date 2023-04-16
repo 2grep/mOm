@@ -138,7 +138,7 @@ def onest(
     '''
     onest = []
     num_obs = case_observer_matrix.shape[0]
-    observers_generator = lib.random_unique_permutations(np.arange(num_obs))
+    observers_generator = lib.random_unique_permutations(np.arange(num_obs), call_count=unique_curves)
 
     for new_curve in range(unique_curves):
         if new_curve % 10 == 0:

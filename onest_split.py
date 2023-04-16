@@ -47,39 +47,37 @@ def run_dataset(
         dataset: np.ndarray, 
         axs: plt.Axes,
         opa_slices: int = 3, 
-        color = "gray", 
-        method: str = "hist"
+        color = "gray"
     ) -> None:
     '''
     Run dataset for either histogram or normal ditribution graph.
     '''
-    if method == "hist":
-        ranges = obs_range(dataset)
-        hist = np.transpose(opa_hist(dataset, opa_slices))[::-1]
+    ranges = obs_range(dataset)
+    hist = np.transpose(opa_hist(dataset, opa_slices))[::-1]
 
-        num_obs = hist.shape[2]
-        num_cases = hist.shape[1]
-        xs = np.arange(num_cases)
-        bins = np.arange(num_cases)
-        for obs in range(num_obs):
-            # Graph ranges
-            axis_col = obs
-            ax = axs[0][axis_col]
-            ax.plot(xs, ranges[obs, :, 0], color=color)
-            ax.plot(xs, ranges[obs, :, 1], color=color)
+    num_obs = hist.shape[2]
+    num_cases = hist.shape[1]
+    xs = np.arange(num_cases)
+    bins = np.arange(num_cases)
+    for obs in range(num_obs):
+        # Graph ranges
+        axis_col = obs
+        ax = axs[0][axis_col]
+        ax.plot(xs, ranges[obs, :, 0], color=color)
+        ax.plot(xs, ranges[obs, :, 1], color=color)
 
-            for opa in range(opa_slices):
-                axis_slice = opa + 1
-                ax = axs[axis_slice][axis_col]
-                ax.hist(
-                    bins, 
-                    bins=bins, 
-                    weights=hist[opa, :, obs], 
-                    align="left", 
-                    color=color, 
-                    alpha=.5
-                )
-        return np.amax(hist)
+        for opa in range(opa_slices):
+            axis_slice = opa + 1
+            ax = axs[axis_slice][axis_col]
+            ax.hist(
+                bins, 
+                bins=bins, 
+                weights=hist[opa, :, obs], 
+                align="left", 
+                color=color, 
+                alpha=.5
+            )
+    return np.amax(hist)
 
 def run_ridge(
         datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]], 
@@ -156,7 +154,7 @@ ax.yaxis.set_tick_params(
 
 # Left column of OPAs
 for opa in range(opa_slices):
-    ax = axs[opa + 1][0]
+    ax = axs[opa_slices - opa][0]
     ax.spines[["left"]].set_visible(True)
     ax.yaxis.set_tick_params(
         left=True,
