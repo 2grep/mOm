@@ -8,9 +8,10 @@ datasets = ["assisted", "unassisted"]
 colors = ["red", "green"]
 datasets = [np.transpose(lib.data_reader(root + dataset + group + ".npy")) for dataset in datasets]
 
-step = 5
+obs_choice = 5 - 1
+step = 1
 num_graphs = 4 + 1
-interest = 28
+interest = 30
 bounds = (interest - step * (num_graphs // 2), interest + step * (num_graphs // 2))
 choices = np.arange(bounds[0], bounds[1], step)
 num_choices = len(choices)
@@ -21,8 +22,8 @@ max = -1
 for i in range(len(datasets)):
     dataset = datasets[i]
     color = colors[i]
-    obs6 = dataset[5]
-    cases = obs6[choices]
+    obs = dataset[obs_choice]
+    cases = obs[choices]
 
     rng = (0, 1)
     def _hist(x):
@@ -36,11 +37,25 @@ for i in range(len(datasets)):
     counts = np.apply_along_axis(_hist, 1, cases)
     
     for j in range(len(choices)):
-        axs[j].hist(
+        ax = axs[j]
+        halfmax = np.amax(counts[j]) / 2
+        center = counts[j] >= halfmax
+        # argmax annoyingly gives the index for the element just after the first True, ergo the -1
+        first = np.argmax(center)
+        last = center.shape[0] - np.argmax(np.flip(center))
+        ax.axhline(
+            y=halfmax,
+            xmin=first / center.shape[0],
+            xmax=last / center.shape[0],
+            color=color,
+            alpha=.7
+        )
+        ax.hist(
             bins[:-1],
             bins=bins,
             weights=counts[j],
             range=rng,
+            align="left",
             color=color,
             alpha=.5
         )
@@ -63,4 +78,6 @@ ax.yaxis.set_tick_params(
     labelleft=True)
 
 plt.tight_layout()
-plt.show()
+plt.savefig("./results/case_split.png",
+            bbox_inches="tight", transparent=False, dpi=1000)
+# plt.show()

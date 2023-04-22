@@ -96,10 +96,10 @@ def run_ridge(
 
     np.savetxt("ridge.csv", ridge, fmt="%d", delimiter=",")
 
-exp = "nottingham/"
-group = ""
-dataset_names = ["./data/" + exp + "nottingham" + group + ".npy",
-                 "./data/" + exp + "tubulus" + group + ".npy"
+exp = "prostate_reader/"
+group = "_5class"
+dataset_names = ["./data/" + exp + "assisted" + group + ".npy",
+                 "./data/" + exp + "unassisted" + group + ".npy"
                  ]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 

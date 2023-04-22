@@ -269,33 +269,31 @@ elif args.model == "sarape":
     observers_axis = np.arange(obs_range[0], obs_range[1] + 1)
     cases_range = (1, dataset_surfaces.shape[2])
     cases_axis = np.arange(cases_range[0], cases_range[1] + 1)
-    observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
+    xyplane = np.meshgrid(cases_axis, observers_axis)
 
     ## Plot
     # We have to draw things backwards to get them layered better
     for dataset in range(dataset_surfaces.shape[0] - 1, -1, -1):
         for surface in dataset_surfaces[dataset, ::-1]:
             ax.plot_surface(
-                observers_axis, cases_axis,
-                surface,
+                *xyplane,
+                np.transpose(surface),
                 cmap=colors[dataset % len(colors)],
-                linewidth=0, 
+                linewidth=0,
                 antialiased=False,
                 zsort="max"
             )
 
     # Customize the z axis.
-    ax.xaxis.set_major_locator(MultipleLocator(6))
-    ax.xaxis.set_major_formatter('{x:.0f}')
-    ax.set_xlim(*obs_range)
-    ax.set_xlabel("Number of Observers")
-    ax.set_ylim(*cases_range)
-    ax.set_ylabel("Number of Cases")
+    ax.yaxis.set_major_locator(MultipleLocator(6))
+    ax.yaxis.set_major_formatter('{x:.0f}')
+    ax.set_xlim(*cases_range)
+    ax.set_xlabel("Number of Cases")
+    ax.set_ylim(*obs_range)
+    ax.set_ylabel("Number of Observers")
     ax.set_zlim(0, 1)
     ax.set_zlabel("Overall Proportion Agreement")
 
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    ax.zaxis.set_major_formatter('{x:.02f}')
     ax.view_init(azim=45, elev=30)
     plt.savefig(
         "./results/sarape.png", 
