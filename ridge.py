@@ -26,6 +26,8 @@ def opa_ks_ridge(
         certainty: float = .95
     ) -> np.ndarray:
     '''
+    Use the two-sample Kolmogorov-Smirnov test to identify the ridge of cases
+
     Parameters
     ----------
     certainty in [0, 1] : level of certainty that treatment and control are resolvable
@@ -35,16 +37,23 @@ def opa_ks_ridge(
 
 
     null_pvalues = np.empty(treatment.shape[:-1])
+    print(np.amax(control))
     print(f"Running with {treatment.shape[0]} at base")
     for obs in range(treatment.shape[0]):
         print("Base:", obs)
-        for i, (x, y) in enumerate(zip(treatment[obs], control[obs])):
-            null_pvalues[obs, i] = stats.ks_2samp(x, y, alternative="greater").pvalue
+        null_pvalues[obs] = ks_flat(treatment[obs], control[obs])
+        # for i, (x, y) in enumerate(zip(treatment[obs], control[obs])):
+        #     null_pvalues[obs, i] = stats.ks_2samp(x, y, alternative="two-sided", mode="exact").pvalue
+    # null_threshold = 1 - certainty
+    # is_valid = null_pvalues <= null_threshold
 
-    null_threshold = 1 - certainty
-    is_valid = null_pvalues <= null_threshold
+    return null_pvalues
 
-    return is_valid
+def ks_flat(treatment, control):
+    null_pvalues = np.empty(treatment.shape[:-1])
+    for i, (x, y) in enumerate(zip(treatment, control)):
+        null_pvalues[i] = stats.ks_2samp(x, y, alternative="two-sided", mode="auto").pvalue
+    return null_pvalues
 
 def run_ks_ridge(
         datasets,
@@ -89,12 +98,11 @@ def run_hist_ridge(
     np.savetxt(fname + ("" if ".csv" == fname[-4:] else ".csv"), ridge, fmt="%d", delimiter=",")
     return ridge
 
-
 # TODO: refactor to calculate these datasets more simply - this requires simplifying onest_analysis.py
 dataset_names = ["./data/prostate_reader/assisted_5class.npy",
                  "./data/prostate_reader/unassisted_5class.npy"]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-# run_ridge(datasets, fname="./results/ridge")
+run_hist_ridge(datasets, fname="./results/ridge", opa_slices=10)
 # opa_ks_ridge(datasets[0], datasets[1])
-run_ks_ridge(datasets, fname="ridge_greater", certainty=.95)
+# run_ks_ridge(datasets, fname="ridge_greater", certainty=.95)

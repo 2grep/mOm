@@ -230,7 +230,7 @@ elif args.model == "sarape":
     if not datasets_from_cache:
         counter = 0
         case_onest_analyses: list[np.ndarray] = []
-        unique_surfaces = 1000
+        unique_surfaces = 10000
 
         for cases_x_observers_matrix in args.datasets:
             single_analysis = sarape(

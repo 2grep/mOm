@@ -1,24 +1,34 @@
 import numpy as np
 import lib
 import matplotlib.pyplot as plt
+from ridge import ks_flat as opaks
 
 root = "./data/prostate_reader/"
 group = "_5class"
 datasets = ["assisted", "unassisted"]
 colors = ["red", "green"]
-datasets = [np.transpose(lib.data_reader(root + dataset + group + ".npy")) for dataset in datasets]
+datasets = np.asarray([np.transpose(lib.data_reader(root + dataset + group + ".npy")) for dataset in datasets])
 
-obs_choice = 5 - 1
-step = 1
-num_graphs = 4 + 1
-interest = 30
-bounds = (interest - step * (num_graphs // 2), interest + step * (num_graphs // 2))
-choices = np.arange(bounds[0], bounds[1], step)
+obs_choice = 6 - 2
+# step = 1
+# num_graphs = 4 + 1
+# interest = 238
+# bounds = (interest - step * (num_graphs // 2), interest + step * (num_graphs // 2))
+# choices = np.arange(bounds[0], bounds[1], step)
+choices = np.arange(0, 33)
 num_choices = len(choices)
 scale = 2.5
 ratio = 1
 fig, axs = plt.subplots(ncols=num_choices, figsize=(num_choices * scale, ratio*scale))
 max = -1
+full_counts = []
+
+res = opaks(datasets[0, obs_choice, choices, :],
+            datasets[1, obs_choice, choices, :])
+print("All above certainty:", np.all(res == 1))
+print("choices:", choices)
+print("ks:", res)
+
 for i in range(len(datasets)):
     dataset = datasets[i]
     color = colors[i]
@@ -35,6 +45,7 @@ for i in range(len(datasets)):
         )
         return hist
     counts = np.apply_along_axis(_hist, 1, cases)
+    full_counts.append(counts)
     
     for j in range(len(choices)):
         ax = axs[j]
