@@ -1,19 +1,28 @@
+import math
 import os
-import random
+# TODO: use numpy.random.Generator for shuffling
+import numpy.random as random
 import numpy as np
 from collections import deque
 import typing as typ
+import time
+
+## Type Variables ##
+T = typ.TypeVar('T')
+
+## Functions ##
 
 def bucket(
-        dataset: np.ndarray, 
-        num_buckets: int, 
-        range: typ.Union[typ.Tuple[int, int], list[int]] = (0, 1)
+        dataset: np.ndarray,
+        num_buckets: int,
+        range: typ.Union[tuple[int, int], list[int]] = (0, 1)
     ) -> np.ndarray:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
     (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
+    Basically just numpy.histogram but makes sure the bins are always the same
 
-    range is exclusive on the right except the last bucket which is inclusive on both sides
+    range is exclusive on the right except the last bucket which is inclusive on both sides.
     '''
     spacer = (range[1] - range[0]) / num_buckets
     return np.apply_along_axis(
@@ -29,8 +38,9 @@ def bucket(
         dataset
     )
 
+# TODO: I think this is deprecated. If so, get rid of it; if not, compare deque to list for rotating
 def rotate(
-        arr: np.ndarray, 
+        arr: np.ndarray,
         num: int
     ) -> np.ndarray:
     '''
@@ -40,11 +50,11 @@ def rotate(
     ind.rotate(num)
     return np.transpose(arr, ind)
 
-
 def data_reader(
         fname: str,
         names: list[str] = [],
-        exts: list[str] = []):
+        exts: list[str] = []
+    ) -> np.ndarray:
     '''
     Read in data from file.
     Appends file names and extensions to names and exts repectively if specified.
@@ -59,35 +69,70 @@ def data_reader(
     elif fext == ".csv":
         data = np.loadtxt(fname, delimiter=",")
         return data
+    raise Exception(f"{fext} is an unrecognized file extension for `fname`.")
 
 def random_unique_permutations(
-        arr: typ.MutableSequence, 
-        max_choices: int = -2
-    ) -> typ.Generator[typ.MutableSequence, None, None]:
+    arr: np.ndarray,
+    call_count: int = None
+) -> typ.Generator[np.ndarray, None, None]:
     '''
-    Generate random, unique permutations of arr upto max_choices number of values.
-    WILL enter infinite loop if called more than len(arr)! times. We do NOT check for this.
-    '''
-    max_choices += 1
-    prev_permutations = []
-    while True:
-        random.shuffle(arr)
-        new_permutation = arr[:max_choices]
-        while new_permutation in prev_permutations:
-            random.shuffle(arr)
-            new_permutation = arr[:max_choices]
+    Generate random, unique (i.e. will never return sequences with the exact same order) 
+    permutations of arr.
 
-        yield new_permutation
+    Parameters
+    ----------
+    arr : array to permute
+    call_count : number of times `next` will be called
+        If supplied, improves performance by not having to check with every call 
+        but may enter infite loop if `next` is called more than `call_count` times.
 
+    Yields
+    ------
+    random_unique_permutations : a new random, unique permutation of seq 
 
-def match(
-        arr: typ.Sequence
-    ) -> bool:
+    Raises
+    ------
+    AssertException : `call_count` is greater than `len(arr)` factorial 
+        (i.e. will call more than the number of possible permutations).
+    AssertException : `next` called more times than `len(arr)!` 
+        (`call_count == None`)
     '''
-    Check if all in `arr` are the same value
+    rng = random.default_rng()
+    prev = set()
+    prev_add = prev.add
+    max = math.factorial(len(arr))
+    if call_count != None:
+        assert call_count <= max, "Cannot generate more unique permutations than exist"
+        while True:
+            rng.shuffle(arr)
+
+            hasharr = arr.data.tobytes()
+            while hasharr in prev:
+                rng.shuffle(arr)
+                hasharr = arr.data.tobytes()
+            prev_add(hasharr)
+
+            yield arr
+    else:
+        while True:
+            assert len(prev) != max, "Cannot get more unique permutations than exist"
+
+            rng.shuffle(arr)
+
+            hashseq = arr.data.tobytes()
+            while hashseq in prev:
+                rng.shuffle(arr)
+                hashseq = arr.data.tobytes()
+            prev_add(hashseq)
+
+            yield arr
+
+def match(match_list: typ.Iterable) -> bool:
     '''
-    first = arr[0]
-    for item in arr:
-        if first != item:
+    Check if all in `match_list` are the same value
+    '''
+    first = match_list[0]
+    for item in match_list[1:]:
+        if item != first:
             return False
     return True

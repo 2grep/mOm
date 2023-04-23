@@ -10,47 +10,23 @@ import typing as typ
 
 # Max/min of observer slice
 def obs_range(
-        dataset: np.ndarray, 
-        observer_slices: int
+        dataset: np.ndarray
     ) -> np.ndarray:
     '''
     Calculate mins and maxs of dataset.
     '''
-    # max number of observers / number of slices
-    obs_step = dataset.shape[0] // observer_slices
-    mins = np.amin(dataset[obs_step::obs_step], axis=2)
-    maxs = np.amax(dataset[obs_step::obs_step], axis=2)
+    mins = np.amin(dataset, axis=2)
+    maxs = np.amax(dataset, axis=2)
     return np.dstack((mins, maxs))
 
 def opa_hist(
-        dataset: np.ndarray, 
-        observer_slices: int, 
-        opa_slices: int, 
-        buckets: int = 100
+        dataset: np.ndarray,
+        opa_slices: int
     ) -> np.ndarray:
     '''
     Calculate histogram of dataset for observers and slices.
     '''
-    # max number of observers / number of slices
-    obs_step = dataset.shape[0] // observer_slices
-    # max number of buckets / number of slices
-    bucket_step = buckets // opa_slices
-    print(buckets, bucket_step)
-    return lib.bucket(dataset, buckets)[::obs_step, :, ::bucket_step]
-
-def opa_stats(
-        dataset: np.ndarray, 
-        observer_slices: int, 
-        opa_slices: int, 
-        buckets: int = 100
-    ) -> np.ndarray:
-    '''
-    Calculate statistics (means and standard deviations) of dataset.
-    '''
-    bucketed = opa_hist(dataset, observer_slices, opa_slices, buckets)
-    means = np.average(bucketed, axis=1)
-    std_devs = np.std(bucketed, axis=1)
-    return np.dstack((means, std_devs))
+    return lib.bucket(dataset, opa_slices)
 
 # opa_hist_ridge(stats_low, stats_high, .9)
 
@@ -69,56 +45,39 @@ def opa_hist_ridge(
 
 def run_dataset(
         dataset: np.ndarray, 
-        axs: plt.Axes, 
-        observer_slices: int = 3, 
+        axs: plt.Axes,
         opa_slices: int = 3, 
-        color: mpl.Color = "gray", 
-        method: str = "hist"
+        color = "gray"
     ) -> None:
     '''
     Run dataset for either histogram or normal ditribution graph.
     '''
-    if method == "hist":
-        ranges = obs_range(dataset, observer_slices)
-        # * buckets >= opa_slices
-        hist = opa_hist(dataset, observer_slices, opa_slices, buckets=opa_slices)
+    ranges = obs_range(dataset)
+    hist = np.transpose(opa_hist(dataset, opa_slices))[::-1]
 
-        xs = np.arange(0, dataset.shape[1])
-        bins = np.arange(0, dataset.shape[1], 1)
-        for row in range(observer_slices):
-            # Graph ranges
-            # axis_row = observer_slices - row - 1
-            axis_row = row
-            axs[0][axis_row].plot(xs, ranges[row][:, 0], color=color)
-            axs[0][axis_row].plot(xs, ranges[row][:, 1], color=color)
+    num_obs = hist.shape[2]
+    num_cases = hist.shape[1]
+    xs = np.arange(num_cases)
+    bins = np.arange(num_cases)
+    for obs in range(num_obs):
+        # Graph ranges
+        axis_col = obs
+        ax = axs[0][axis_col]
+        ax.plot(xs, ranges[obs, :, 0], color=color)
+        ax.plot(xs, ranges[obs, :, 1], color=color)
 
-            for opa_slice in range(opa_slices):
-                axis_slice = opa_slices - opa_slice
-                axs[axis_slice][axis_row].hist(
-                    xs, bins=bins, weights=hist[row, : , opa_slice], 
-                    align="left", color=color, alpha=.5)
-                axs[axis_slice][axis_row].set_ylim(0, 1000)
-
-    elif method == "norm":
-        ranges = obs_range(dataset, observer_slices)
-        stats = opa_stats(dataset, observer_slices, opa_slices)
-
-        xs = np.arange(0, dataset.shape[1])
-        for row in range(observer_slices):
-            # Graph ranges
-            axs[row][0].plot(xs, ranges[row][:, 0], color=color)
-            axs[row][0].plot(xs, ranges[row][:, 1], color=color)
-
-            # Graph stats
-            for opa_slice in range(opa_slices):
-                axs[row][opa_slice + 1].plot(
-                    xs, 
-                    norm.pdf(
-                        xs, 
-                        stats[row][opa_slice][0], 
-                        stats[row][opa_slice][1]
-                    ), 
-                    color=color)
+        for opa in range(opa_slices):
+            axis_slice = opa + 1
+            ax = axs[axis_slice][axis_col]
+            ax.hist(
+                bins, 
+                bins=bins, 
+                weights=hist[opa, :, obs], 
+                align="left", 
+                color=color, 
+                alpha=.5
+            )
+    return np.amax(hist)
 
 def run_ridge(
         datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]], 
@@ -137,25 +96,94 @@ def run_ridge(
 
     np.savetxt("ridge.csv", ridge, fmt="%d", delimiter=",")
 
-dataset_names = ["assisted_3case.npy", "unassisted_3case.npy"]
+exp = "prostate_reader/"
+group = "_5class"
+dataset_names = ["./data/" + exp + "assisted" + group + ".npy",
+                 "./data/" + exp + "unassisted" + group + ".npy"
+                 ]
 datasets = [np.transpose(lib.data_reader(set)) for set in dataset_names]
 
-
-observer_slices = 18
+num_obs = datasets[0].shape[0]
+num_cases = datasets[0].shape[1]
 opa_slices = 10
-# hist_high = opa_hist(datasets[0], observer_slices, opa_slices, opa_slices)
-# hist_low = opa_hist(datasets[1], observer_slices, opa_slices, opa_slices) 
 
 colors = ["red", "green"]
-fig, axs = plt.subplots(ncols=observer_slices, nrows=(opa_slices + 1), squeeze=False, sharex=True, figsize=(observer_slices * 1.5, (opa_slices + 1) * 1.5))
+fig, axs = plt.subplots(nrows=(opa_slices + 1), ncols=num_obs, 
+                        figsize=(num_obs * 1.5, (opa_slices + 1) * 1.5), 
+                        squeeze=False
+                        )
 
-# fig, ax = plt.subplots()
-
-run_ridge(datasets, observer_slices, opa_slices, 9)
-
-
+max = -1
 for i in range(len(datasets)):
-    run_dataset(datasets[i], axs, observer_slices, opa_slices, color=colors[i])
+    test = run_dataset(datasets[i], axs, opa_slices, color=colors[i])
+    max = max if max > test else test
 
-plt.savefig("mom.png", bbox_inches="tight")
-plt.show()
+## Adjust plot parameters
+# Hide the axes
+for row in axs:
+    for ax in row:
+        # Hide labels
+        ax.tick_params(
+            axis="both",
+            which="both",
+            top=False,
+            bottom=False,
+            left=False,
+            right=False,
+            labeltop=False,
+            labelbottom=False,
+            labelleft=False,
+            labelright=False,
+        )
+        # Hide spines
+        ax.spines[["left", "right", "top", "bottom"]].set_visible(False)
+        # Adjust limits
+        ax.set_xlim(0, num_cases)
+
+# Specifics for the OPAs
+for row in axs[1:]:
+    for ax in row:
+        ax.set_ylim(0, max)
+
+# Show edge axes
+ax = axs[0][0]
+ax.spines[["left"]].set_visible(True)
+ax.yaxis.set_tick_params(
+    left=True,
+    labelleft=True)
+
+# Left column of OPAs
+for opa in range(opa_slices):
+    ax = axs[opa_slices - opa][0]
+    ax.spines[["left"]].set_visible(True)
+    ax.yaxis.set_tick_params(
+        left=True,
+        labelleft=True)
+    ax.set_ylabel(str(round(opa/opa_slices, 2)) + " - " + str(round((opa+1)/opa_slices, 2)))
+
+# Bottom row of OPAs
+for obs in range(num_obs):
+    ax = axs[opa_slices][obs]
+    ax.spines[["bottom"]].set_visible(True)
+    ax.xaxis.set_tick_params(
+        bottom=True,
+        labelbottom=True
+    )
+    ax.set_xlabel(obs + 2)
+plt.tight_layout()
+
+fig.text(0, .5, "Overall Proportion Agreement", 
+         rotation="vertical",
+         size="xx-large",
+         horizontalalignment="center",
+         verticalalignment="center",
+        )
+fig.text(.5, 0, "Number of Observers", 
+         rotation="horizontal",
+         size="xx-large",
+         horizontalalignment="center",
+         verticalalignment="center",
+         )
+
+plt.savefig("./results/" + exp + "hist" + group + ".png",
+            bbox_inches="tight", transparent=False, dpi=100)

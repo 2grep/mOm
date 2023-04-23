@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import time
 import lib
-import typing as typ
 
 # TODO: convert from pandas DataFrames to NumPy nd_arrays for ALL calculations
 
@@ -33,26 +32,22 @@ parser.add_argument("-m", "--model", help="""Model for analysis:
 parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
 # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
 parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
-parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels")
+parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels", nargs="*")
 parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
 
 args = parser.parse_args()
 
 file_names = []
 file_exts = []
-args.datasets = [lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names]
-
-datasets_from_cache = [".pkl", ".npy"] in file_exts
 
 ## FUNCTIONS ##
 # Written in the style of David Jin wrote these, originally here:
 # https://colab.research.google.com/drive/10By9_PZLvDY9EAa-n_tt8RGvSfoaQO8x
 
-def overall_proportion_agreement(
-        case_observer_matrix: np.ndarray
-    ) -> float:
+def overall_proportion_agreement(case_observer_matrix: np.ndarray) -> float:
     '''
-    Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and returns a measure of the overall agreement for observers.
+    Overall proportion agreement (OPA) takes in a N x O_m matrix of N cases rated by O_m observers and 
+    returns a measure of the overall agreement for observers.
 
     Assumes observers are in first dimension
     '''
@@ -63,12 +58,12 @@ def overall_proportion_agreement(
 
 def sarape(
         case_observer_matrix: np.ndarray, 
-        unique_surfaces: int, 
-        max_observers: int,
-        max_cases: int
+        unique_surfaces: int
     ) -> np.ndarray:
+    # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
-    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from the full space of samples
+    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from
+    the full space of samples. 
 
     Parameters
     ----------
@@ -80,24 +75,23 @@ def sarape(
          [O0, O1, ..., Oc]]
         ```
     unique_surfaces : number of surfaces to run
-        More surfaces is a better sample of the full space but takes longer. However, this MUST be less 
-        than `min(case_observer_matrix.shape)!` or this will enter an infinite loop; we do NOT check for this.
-    max_observers, max_cases : a maximum limit to the number of observers/cases to use in each surface
-        will use the minimum of this and respective axis shape of case_observer_matrix
+        More surfaces is a better sample of the full space but takes longer. "Unique" meaning the orders 
+        of rows and columns of case_observer_matrix are independently (i.e. uniqueness in row is unrelated
+        to that of columns) unique orderings.
     
     Returns
     -------
-    sarape : surfaces calculated as shape `(unique_surfaces, cases, observers - 1)`
+    sarape : surfaces calculated with a shape of `(unique surfaces, cases, total observers - 1)`
     '''
     # Generators for observers and cases
 
     num_obs = case_observer_matrix.shape[0]
     num_cases = case_observer_matrix.shape[1]
-    obs_gen = lib.random_unique_permutations(np.arange(num_obs), max_observers)
-    cases_gen = lib.random_unique_permutations(np.arange(num_cases), max_cases)
+    obs_gen = lib.random_unique_permutations(np.arange(num_obs), call_count=unique_surfaces)
+    cases_gen = lib.random_unique_permutations(np.arange(num_cases), call_count=unique_surfaces)
 
     space = []
-    for new_surface in np.arange(unique_surfaces):
+    for new_surface in range(unique_surfaces):
         if new_surface % 10 == 0:
             print("Running surface:", new_surface)
 
@@ -105,7 +99,7 @@ def sarape(
         surf_cases = next(cases_gen)
 
         # cases x observers
-        opa_grid = []
+        grid = []
         for case_ind in range(num_cases):
             reduced_cases = surf_cases[:case_ind + 1]
 
@@ -118,14 +112,13 @@ def sarape(
                 opa = overall_proportion_agreement(matrix)
 
                 observer_opas.append(opa)
-            opa_grid.append(observer_opas)
-        space.append(opa_grid)
+            grid.append(observer_opas)
+        space.append(grid)
     return np.array(space, copy=False)
 
 def onest(
         case_observer_matrix: np.ndarray, 
-        unique_curves: int, 
-        max_observers: int
+        unique_curves: int
     ) -> np.ndarray:
     '''
     Parameters
@@ -137,145 +130,125 @@ def onest(
          ...
          [O0, O1, ..., Oc]]
         ```
-    max_observers : a maximum limit to the number of observers to use in each curve
-        will use the minimum of this and `case_observer_matrix.shape[0]`
-    '''
-    # slicing is exclusive, we assume max_observers is inclusive (if you want to use 10 observers, you get 10 observers / 9 OPAs)
-    max_observers += 1
+    unique_curves : number of curves to runs
 
+    Returns
+    -------
+    onest : 
+    '''
     onest = []
-    observers_generator = lib.random_unique_permutations(case_observer_matrix.shape[0], max_observers)
+    num_obs = case_observer_matrix.shape[0]
+    observers_generator = lib.random_unique_permutations(np.arange(num_obs), call_count=unique_curves)
 
     for new_curve in range(unique_curves):
         if new_curve % 10 == 0:
             print("Running curve: ", new_curve)
 
-        observers_for_this_curve = next(observers_generator)
+        curve_obs = next(observers_generator)
 
         ## Generate single onest curve
         curve = []
-        for index in range(2, len(observers_for_this_curve) + 1):
+        for ind in range(2, num_obs + 1):
             # num of observers x OPA point on the ONEST curve
-            curve.append(overall_proportion_agreement(case_observer_matrix, observers_for_this_curve[:index]))
+            reduced_obs = curve_obs[:ind]
+            matrix = case_observer_matrix[reduced_obs]
+            opa = overall_proportion_agreement(matrix)
+            curve.append(opa)
 
-        onest = pd.concat([onest, pd.Series(curve, index=range(2, len(curve) + 2))], ignore_index=False, axis=1)
-    return onest
+        onest.append(curve)
+    return np.array(onest, copy=False)
 
+
+args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
+datasets_from_cache = any(ext in file_exts for ext in [".pkl", ".npy"])
 
 if args.model == "onest":
-    unique_curves = 100
+    unique_curves = 1000
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
-    dataset_onest_analyses = []
     if not datasets_from_cache:
         counter = 0
+        onest_analyses: list[np.ndarray] = []
         for cases_x_observers_matrix in args.datasets:
-            # ? How should we structure the call for unique_curves and O_max to be obvious and versatile
-            # Ideas:
-            # data_1 [unique_curves_1] [o_max_1] data_2 [unique_curves_2] [o_max_2] ...
-            # data_1 data_2 ... [--unique_curves uc_1 uc_2 ...] [--o_max om_1 om_2 ...]
-            # --data_set data_1 [unique_curves_1] [o_max_1] --data_set data_1 [unique_curves_1] [o_max_1] ...
-            o_max = len(cases_x_observers_matrix.columns)
-            cases_x_observers_onest_analysis = onest(cases_x_observers_matrix, unique_curves, o_max)
-            if args.describe:
-                # Desribe as mean, min, max if desired
-                cases_x_observers_onest_analysis = cases_x_observers_onest_analysis.apply(pd.DataFrame.describe, axis=1)[["mean", "min", "max"]]
+            analysis = onest(np.transpose(cases_x_observers_matrix), unique_curves)
 
-            dataset_onest_analyses.append(cases_x_observers_onest_analysis)
+            onest_analyses.append(analysis)
 
             if args.cache:
-                # TODO: Need to encode certain information in args such as if -d is flagged
-                cases_x_observers_onest_analysis.to_pickle(file_names[counter] + ".pkl")
+                np.save(file_names[counter] + ".npy", analysis)
                 counter += 1
+        onest_analyses = np.asarray(onest_analyses)
+        # pyplot.Axes.plot calls for observers to be last
+        onest_analyses = np.transpose(onest_analyses, (0, 2, 1))
     
     else:
-        dataset_onest_analyses = args.datasets
+        onest_analyses = args.datasets
+
+    if args.describe:
+        # Desribe as min, mean, max if desired
+        onest_curves = np.dstack((
+            np.apply_along_axis(np.amin,    2, onest_analyses), 
+            np.apply_along_axis(np.average, 2, onest_analyses), 
+            np.apply_along_axis(np.amax,    2, onest_analyses)
+        ))
+
+    else:
+        onest_curves = onest_analyses
 
     ## Plot each analysis
     fig, ax = plt.subplots()
-    plots = [dataset_onest_analyses[0].plot.line(
-        style="-" if args.describe else "o-", 
-        color=args.colors[0], 
-        # legend=False, 
-        label="Label 1",
-        fillstyle="none",
-        linewidth=1 if args.describe else .5,
-        ax=ax
-    )]
-    counter = 0
-    for data in dataset_onest_analyses[1:]:
-        counter += 1
-        plots.append(
-            data.plot.line(
-                style="-" if args.describe else "o-",
-                color=args.colors[counter % len(args.colors)],
-                # legend=False,
-                fillstyle="none",
-                linewidth=1 if args.describe else .5,
-                ax=ax
-            )
+    obs_range = (2, onest_analyses.shape[1] + 1)
+    xs = np.arange(obs_range[0], obs_range[1] + 1)
+    for dataset in range(onest_curves.shape[0]):
+        ax.plot(
+            xs, onest_curves[dataset],
+            ("-" if args.describe else "o-"),
+            color=args.colors[dataset % len(args.colors)],
+            fillstyle="none",
+            linewidth=1 if args.describe else .5
         )
 
     # adjust plot parameters
     ax.xaxis.set_major_locator(MultipleLocator(6))
     ax.xaxis.set_major_formatter('{x:.0f}')
-    ax.set_xlim([dataset_onest_analyses[0].index[0],
-                dataset_onest_analyses[0].index[-1]])
+    # should have 3+ observers or this errors
+    ax.set_xlim(*obs_range)
     ax.set_xlabel("Number of Observers")
-    ax.set_ylim([0, 1])
+    ax.set_ylim(0, 1)
     ax.set_ylabel("Overall Proportion Agreement")
     ax.legend(ax.get_lines()[::(3 if args.describe else unique_curves)],
               args.labels if args.labels != None else file_names)
-
+    plt.savefig(
+        "./results/onest.png",
+        bbox_inches="tight",
+        transparent=False,
+        dpi=1000
+    )
     plt.show()
 
 elif args.model == "sarape":
-    # TODO: adjust this to work with both cached and uncached data
-    # - NumPy ndarray (aka. just go all in on numpy); more overhead in flipping around the data but full consistency
-
-    # observers_min = args.datasets[0].index[0]
-    # observers_max = args.datasets[0].index[-1]
-    observers_min = 2
-    observers_max = 20
-    observers_axis = np.arange(observers_min, observers_max + 1)
-    cases_min = 1
-    # cases_max = len(args.datasets[0].columns)
-    cases_max = 240
-    cases_axis = np.arange(cases_min, cases_max + 1)
-    observers_axis, cases_axis = np.meshgrid(observers_axis, cases_axis)
-
-    # Run ONEST with O observers and C cases (for each cell in [observers_axis x cases_axis])
-    case_onest_analyses = []
-    counter = 0
+    # Calculate model for each dataset
     if not datasets_from_cache:
+        counter = 0
+        case_onest_analyses: list[np.ndarray] = []
+        unique_surfaces = 10000
+
         for cases_x_observers_matrix in args.datasets:
-            # Get case x observer bounds
-            unique_surfaces = 1000
-            max_num_cases = cases_x_observers_matrix.shape[0]
-            max_num_observers = cases_x_observers_matrix.shape[1]
-
-            start = time.time()
             single_analysis = sarape(
-                np.transpose(cases_x_observers_matrix), unique_surfaces, max_num_cases, max_num_observers)
-            end = time.time()
-            print("ONEST calculation time:", end - start)
-
-            case_onest_analyses.append(single_analysis)
+                np.transpose(cases_x_observers_matrix),
+                unique_surfaces
+            )
 
             if args.cache:
                 np.save(file_names[counter], np.asarray(single_analysis))
                 counter += 1
 
-        # case_onest_analyes = ndarry
-        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
-        #                    = (datasets, surfaces, cases, observers - 1)
+            case_onest_analyses.append(single_analysis)
         case_onest_analyses = np.asarray(case_onest_analyses)
 
     else:
-        # case_onest_analyes = list of ndarrys
-        # case_onest_analyes = (len(args.datasets), unique_surfaces, max_num_cases, max_num_observers - 1)
-        #                    = (datasets, surfaces, cases, observers - 1)
         case_onest_analyses = args.datasets
 
+    ## Description
     if args.describe:
         # Get min and max
         dataset_surfaces = []
@@ -287,35 +260,45 @@ elif args.model == "sarape":
         dataset_surfaces = np.asarray(dataset_surfaces)
     
     else:
-        dataset_surfaces = np.asarray(case_onest_analyses)
+        dataset_surfaces = case_onest_analyses
+
 
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    # Plot the surface
     colors = ["coolwarm", "PiYG"]
+    obs_range = (2, dataset_surfaces.shape[3] + 1)
+    observers_axis = np.arange(obs_range[0], obs_range[1] + 1)
+    cases_range = (1, dataset_surfaces.shape[2])
+    cases_axis = np.arange(cases_range[0], cases_range[1] + 1)
+    xyplane = np.meshgrid(cases_axis, observers_axis)
 
-    print(dataset_surfaces.shape)
-    for dataset in np.arange(dataset_surfaces.shape[0]):
-        for surface in dataset_surfaces[dataset]:
+    ## Plot
+    # We have to draw things backwards to get them layered better
+    for dataset in range(dataset_surfaces.shape[0] - 1, -1, -1):
+        for surface in dataset_surfaces[dataset, ::-1]:
             ax.plot_surface(
-                observers_axis, 
-                cases_axis, 
-                surface, 
+                *xyplane,
+                np.transpose(surface),
                 cmap=colors[dataset % len(colors)],
-                inewidth=0, 
-                antialiased=False
+                linewidth=0,
+                antialiased=False,
+                zsort="max"
             )
 
     # Customize the z axis.
-    ax.xaxis.set_major_locator(MultipleLocator(6))
-    ax.xaxis.set_major_formatter('{x:.0f}')
-    ax.set_xlim(2, 20)
-    ax.set_xlabel("Number of Observers")
-    ax.set_ylim([1, 240])
-    ax.set_ylabel("Number of Cases")
+    ax.yaxis.set_major_locator(MultipleLocator(6))
+    ax.yaxis.set_major_formatter('{x:.0f}')
+    ax.set_xlim(*cases_range)
+    ax.set_xlabel("Number of Cases")
+    ax.set_ylim(*obs_range)
+    ax.set_ylabel("Number of Observers")
     ax.set_zlim(0, 1)
     ax.set_zlabel("Overall Proportion Agreement")
 
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    ax.zaxis.set_major_formatter('{x:.02f}')
-
+    ax.view_init(azim=45, elev=30)
+    plt.savefig(
+        "./results/sarape.png", 
+        bbox_inches="tight", 
+        transparent=False,
+        dpi=1000
+    )
     plt.show()
