@@ -1,0 +1,1 @@
+python3 alpha.py > ./log/distspeed.txt

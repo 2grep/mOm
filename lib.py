@@ -1,6 +1,5 @@
 import math
 import os
-# TODO: use numpy.random.Generator for shuffling
 import numpy.random as random
 import numpy as np
 from collections import deque
