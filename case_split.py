@@ -11,11 +11,11 @@ datasets = np.asarray([np.transpose(lib.data_reader(root + dataset + group + ".n
 
 obs_choice = 6 - 2
 # step = 1
-# num_graphs = 4 + 1
-# interest = 238
-# bounds = (interest - step * (num_graphs // 2), interest + step * (num_graphs // 2))
+# num_graphs = 4
+# interest = 43
+# bounds = (interest - step * (num_graphs // 2), interest + step * (num_graphs // 2 + 1))
 # choices = np.arange(bounds[0], bounds[1], step)
-choices = np.arange(0, 33)
+choices = np.arange(28, 33 + 1)
 num_choices = len(choices)
 scale = 2.5
 ratio = 1
@@ -49,18 +49,6 @@ for i in range(len(datasets)):
     
     for j in range(len(choices)):
         ax = axs[j]
-        halfmax = np.amax(counts[j]) / 2
-        center = counts[j] >= halfmax
-        # argmax annoyingly gives the index for the element just after the first True, ergo the -1
-        first = np.argmax(center)
-        last = center.shape[0] - np.argmax(np.flip(center))
-        ax.axhline(
-            y=halfmax,
-            xmin=first / center.shape[0],
-            xmax=last / center.shape[0],
-            color=color,
-            alpha=.7
-        )
         ax.hist(
             bins[:-1],
             bins=bins,
