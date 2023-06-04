@@ -1,55 +1,10 @@
 import matplotlib
-import fitter
-import multiprocessing as mp
 import numpy as np
 import scipy.stats as stats
 import time
-import typing
 import matplotlib.pyplot as plt
 
-# Apply along axis multiprocessing courtasy of https://stackoverflow.com/a/45555516/16755079
-def unpacking_apply_along_axis(all_args):
-    """
-    Like numpy.apply_along_axis(), but with arguments in a tuple
-    instead.
-
-    This function is useful with multiprocessing.Pool().map(): (1)
-    map() only handles functions that take a single argument, and (2)
-    this function can generally be imported from a module, as required
-    by map().
-    """
-    (func1d, axis, arr, args, kwargs) = all_args
-    return np.apply_along_axis(func1d, axis, arr, *args, **kwargs)
-
-def parallel_apply_along_axis(
-        func1d: typing.Callable,
-        axis: int, 
-        arr: np.ndarray, 
-        *args, **kwargs):
-    """
-    Like numpy.apply_along_axis(), but takes advantage of multiple
-    cores.
-    """
-    # Effective axis where apply_along_axis() will be applied by each
-    # worker (any non-zero axis number would work, so as to allow the use
-    # of `np.array_split()`, which is only done on axis 0):
-    effective_axis = 1 if axis == 0 else axis
-    if effective_axis != axis:
-        arr = arr.swapaxes(axis, effective_axis)
-
-    # Chunks for the mapping (only a few chunks):
-    chunks = [(func1d, effective_axis, sub_arr, args, kwargs) for sub_arr in np.array_split(arr, mp.cpu_count())]
-
-    pool = mp.Pool()
-    individual_results = pool.map(unpacking_apply_along_axis, chunks)
-    # Freeing the workers:
-    pool.close()
-    pool.join()
-
-    return np.concatenate(individual_results)
-
-
-def fit(data: np.ndarray) -> stats._distn_infrastructure.rv_continuous_frozen:
+def fit(data: np.ndarray) -> stats.rv_continuous:
     try:
         params = stats.beta.fit(data)
         return stats.beta(*params)
@@ -57,13 +12,33 @@ def fit(data: np.ndarray) -> stats._distn_infrastructure.rv_continuous_frozen:
         print("Failed fit, returning `None`: ", e)
         return None
 
-def compare(assisted, unassisted, alpha_error=.05):
+def compare(
+    assisted: np.ndarray[stats.rv_continuous], 
+    unassisted: np.ndarray[stats.rv_continuous], 
+    alpha_error: float = .05
+) -> tuple[np.ndarray[float], np.ndarray[float]]:
     try:
         cutoff = unassisted.ppf(1 - alpha_error)
         beta_error = assisted.cdf(cutoff)
         return (cutoff, beta_error)
     except Exception as e:
         return None
+
+# `test` is largely equivalent to the above line but lets me analyze the indices it fails on
+def test() -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], float]:
+    start = time.time()
+    fits = np.empty_like(datasets[..., 0], dtype=stats.rv_continuous)
+    fails = []
+    for i in range(datasets.shape[0]):
+        for j in range(datasets.shape[1]):
+            for k in range(datasets.shape[2]):
+                try:
+                    fits[i, j, k] = fit(datasets[i, j, k])
+                except Exception as e:
+                    print(f"Fail on ({i}, {j}, {k}): {e}")
+                    fails.append((i, j, k))
+    end = time.time()
+    return (fits, fails, end - start)
 
 # def main():
 print("starting...")
@@ -85,25 +60,9 @@ print("Got datasets")
 
 ## * Fit each sample for observers x cases
 print("Running fits...", flush=True)
-# betas = np.apply_along_axis(fit, 3, datasets) # drops samples, gets params
-# `test` is largely equivalent to the above line but lets me analyze the indices it fails on
-def test() -> tuple[np.ndarray[stats._distn_infrastructure.rv_continuous_frozen], list[tuple[int]], int]:
-    start = time.time()
-    fits = np.empty_like(datasets[..., 0], dtype=stats._distn_infrastructure.rv_continuous_frozen)
-    fails = []
-    for i in range(datasets.shape[0]):
-        for j in range(datasets.shape[1]):
-            for k in range(datasets.shape[2]):
-                try:
-                    fits[i, j, k] = fit(datasets[i, j, k])
-                except Exception as e:
-                    print(f"Fail on ({i}, {j}, {k}): {e}")
-                    fails.append((i, j, k))
-    end = time.time()
-    return (fits, fails, end - start)
-
-res["test"] = test()
-betas = res["test"][0]
+# res["test"] = test()
+# betas = res["test"][0]
+betas = np.apply_along_axis(fit, -1, datasets)
 print("Fits finished.")
 
 
@@ -132,11 +91,23 @@ fig, axs = plt.subplots(
 x = np.linspace(0, 1, num=500)
 constant_indices = True
 is_cdf = False
-for row in range(axs.shape[0]):
-    for col in range(axs.shape[1]):
+with np.nditer(
+    axs,
+    flags=[
+        "multi_index",
+        "refs_ok"
+    ],
+    op_flags=[
+        "readwrite"
+    ],
+    op_dtypes=matplotlib.axes._axes.Axes
+) as it:
+    for ax in it:
+        ax = ax.item()
+
         ind = (
-            obs[col], 
-            cases[row]
+            obs[it.multi_index[1]], 
+            cases[it.multi_index[0]]
         )
         # Adjust indices to skip None in betas
         while any(
@@ -148,14 +119,13 @@ for row in range(axs.shape[0]):
             # increment cases if needed
             ind = (ind[0], ind[1] + 1)
             constant_indices = False
-        ax = axs[row, col]
         ax.set_xlabel(ind[0] + 1)
         ax.set_ylabel(ind[1] + 1)
         for group in range(datasets.shape[0]):
             # Finally, graph emperical (hist) and theoretical (plot) pdfs for each SARAPE surface
             group_ind = (group, *ind)
             hist = ax.hist(
-                datasets[*group_ind], 
+                datasets[group_ind[0], group_ind[1], group_ind[2]], 
                 bins=histogram_bins, 
                 range=(0, 1), 
                 align="mid",
@@ -165,9 +135,9 @@ for row in range(axs.shape[0]):
                 alpha=.5
             )[0]
             if is_cdf:
-                y = betas[*group_ind].cdf(x)
+                y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
             else:
-                y = betas[*group_ind].pdf(x)
+                y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
             ax.plot(
                 x, y,
                 color=colors[group]
@@ -211,8 +181,8 @@ with np.nditer(
             if not is_bottom_row:
                 ax.set_xlabel("")
 
-form = "CDF" if is_cdf else "PDF"
-fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {form}s")
+graph_form = "CDF" if is_cdf else "PDF"
+fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {graph_form}s")
 fig.supxlabel("Observer Count")
 fig.supylabel("Case Count")
 
@@ -225,12 +195,12 @@ def kstest(x):
         return None
     data = x[1:].astype('f')
     return stats.kstest(data, beta.cdf)
-res["kstest"] = np.apply_along_axis(kstest, 3, combo)
+res["kstest"] = np.apply_along_axis(kstest, -1, combo)
 
 
 ## * Beta comparison
 print("Running cutoffs...", flush=True)
-cutoff_and_theoretical_beta_error = np.transpose(
+res["theoretical"] = np.transpose(
     np.apply_along_axis(
         lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
         0, 
@@ -239,18 +209,24 @@ cutoff_and_theoretical_beta_error = np.transpose(
     ),
     (2, 1, 0)
 )
-t_beta = np.transpose(cutoff_and_theoretical_beta_error[..., 1])
+t_beta = np.transpose(res["theoretical"][..., 1])
 
 # Getting emperical beta values
 datasets = np.sort(datasets)
-def _eppf(p, sorted_data):
+def _eppf(
+    p: float, 
+    sorted_data: list[float]
+) -> float:
     return sorted_data[int(p * len(sorted_data))]
 eppf = np.vectorize(
     _eppf,
     signature="(),(n)->()"
 )
 
-def _ecdf(x, sorted_data):
+def _ecdf(
+    x: float, 
+    sorted_data: list[float]
+) -> float:
     return np.searchsorted(sorted_data, x) / len(sorted_data)
 ecdf = np.vectorize(
     _ecdf,
@@ -264,12 +240,17 @@ e_beta = ecdf(cutoff, assisted)
 res["beta_diff"] = e_beta - t_beta
 
 
-
-
 ## * Save results
-# print("saving...", flush=True)
-# np.savetxt(results + "alpha_beta_cutoffs.csv", cutoff_and_beta_error[:, :, 0], delimiter=",", fmt="%.3f")
-# np.savetxt(results + "alpha_beta_error.csv", cutoff_and_beta_error[:, :, 1], delimiter=",", fmt="%.3f")
+print("saving...", flush=True)
+np.savetxt(results + "theoretical_cutoffs.csv", res["theoretical"][:, :, 0], delimiter=",", fmt="%.3f")
+np.savetxt(results + "theoretical_beta.csv", res["theoretical"][:, :, 1], delimiter=",", fmt="%.3f")
+np.savetxt(results + "e-t_beta_diff.csv", res["beta_diff"], delimiter=",", fmt="%.3f")
+plt.savefig(
+    f"{results}/{graph_form}.png",
+    bbox_inches="tight",
+    transparent=False,
+    dpi=1000
+)
 plt.show()
 
 # if __name__ == '__main__':
