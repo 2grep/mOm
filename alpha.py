@@ -63,7 +63,6 @@ def compare(assisted, unassisted, alpha_error=.05):
         beta_error = assisted.cdf(cutoff)
         return (cutoff, beta_error)
     except Exception as e:
-        print(e)
         return None
 
 # def main():
@@ -240,21 +239,28 @@ cutoff_and_theoretical_beta_error = np.transpose(
     ),
     (2, 1, 0)
 )
-t_beta = cutoff_and_theoretical_beta_error[..., 1]
+t_beta = np.transpose(cutoff_and_theoretical_beta_error[..., 1])
 
 # Getting emperical beta values
-# cutoff = unassisted.ppf(1 - alpha_error)
-# beta_error = assisted.cdf(cutoff)
 datasets = np.sort(datasets)
-# ! This is a rough sketch, not the actual code that takes into account indices
-def eppf(p, sorted_data):
+def _eppf(p, sorted_data):
     return sorted_data[int(p * len(sorted_data))]
+eppf = np.vectorize(
+    _eppf,
+    signature="(),(n)->()"
+)
 
-def cdf(x, sorted_data):
-    return x
+def _ecdf(x, sorted_data):
+    return np.searchsorted(sorted_data, x) / len(sorted_data)
+ecdf = np.vectorize(
+    _ecdf,
+    signature="(),(n)->()"
+)
 
-cutoff = np.searchsorted(datasets["assisted"], t_beta)
-e_beta = datasets["unassisted"][:cutoff].size
+assisted = datasets[0]
+unassisted = datasets[1]
+cutoff = eppf(1 - alpha_error, unassisted)
+e_beta = ecdf(cutoff, assisted)
 res["beta_diff"] = e_beta - t_beta
 
 
