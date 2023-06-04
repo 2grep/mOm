@@ -1,1 +1,1 @@
-python3 alpha.py > ./log/distspeed.txt
+python3 -i alpha.py > ./log/distspeed.txt

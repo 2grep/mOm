@@ -32,22 +32,10 @@ def bucket(
                 range[1] + spacer, 
                 spacer
             )
-        )[0],
-        len(dataset.shape) - 1,
+        )[0], # histogram returns a tuple, the first item is the histogram array
+        len(dataset.shape) - 1, # apply along the last axis
         dataset
     )
-
-# TODO: I think this is deprecated. If so, get rid of it; if not, compare deque to list for rotating
-def rotate(
-        arr: np.ndarray,
-        num: int
-    ) -> np.ndarray:
-    '''
-    Rotate the ordering of the indices of arr
-    '''
-    ind = deque(np.arange(0, len(arr.shape)))
-    ind.rotate(num)
-    return np.transpose(arr, ind)
 
 def data_reader(
         fname: str,
@@ -100,33 +88,30 @@ def random_unique_permutations(
     prev = set()
     prev_add = prev.add
     max = math.factorial(len(arr))
+
+    def next(rng, arr):
+        rng.shuffle(arr)
+
+        hasharr = arr.data.tobytes()
+        while hasharr in prev:
+            rng.shuffle(arr)
+            hasharr = arr.data.tobytes()
+        prev_add(hasharr)
+
+        return arr
+    
     if call_count != None:
         assert call_count <= max, "Cannot generate more unique permutations than exist"
         while True:
-            rng.shuffle(arr)
+            yield next(rng, arr)
 
-            hasharr = arr.data.tobytes()
-            while hasharr in prev:
-                rng.shuffle(arr)
-                hasharr = arr.data.tobytes()
-            prev_add(hasharr)
-
-            yield arr
     else:
         while True:
             assert len(prev) != max, "Cannot get more unique permutations than exist"
 
-            rng.shuffle(arr)
+            yield next(rng, arr)
 
-            hashseq = arr.data.tobytes()
-            while hashseq in prev:
-                rng.shuffle(arr)
-                hashseq = arr.data.tobytes()
-            prev_add(hashseq)
-
-            yield arr
-
-def match(match_list: typ.Iterable) -> bool:
+def all_match(match_list: typ.Iterable) -> bool:
     '''
     Check if all in `match_list` are the same value
     '''
