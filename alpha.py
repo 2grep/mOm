@@ -5,6 +5,9 @@ import time
 import matplotlib.pyplot as plt
 
 def fit(data: np.ndarray) -> stats.rv_continuous:
+    """
+    Fit data to beta distribution. Returns `None` if if gets an `Exception`
+    """
     try:
         params = stats.beta.fit(data)
         return stats.beta(*params)
@@ -24,8 +27,10 @@ def compare(
     except Exception as e:
         return None
 
-# `test` is largely equivalent to the above line but lets me analyze the indices it fails on
 def test() -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], float]:
+    """
+    Functionally equivalent (though slower) to just applying fit along the axes of datasets but gives more information about failure and timing
+    """
     start = time.time()
     fits = np.empty_like(datasets[..., 0], dtype=stats.rv_continuous)
     fails = []
@@ -39,6 +44,7 @@ def test() -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], float]:
                     fails.append((i, j, k))
     end = time.time()
     return (fits, fails, end - start)
+
 
 # def main():
 print("starting...")
@@ -60,9 +66,12 @@ print("Got datasets")
 
 ## * Fit each sample for observers x cases
 print("Running fits...", flush=True)
+
 # res["test"] = test()
 # betas = res["test"][0]
 betas = np.apply_along_axis(fit, -1, datasets)
+
+res["betas"] = betas
 print("Fits finished.")
 
 
@@ -110,15 +119,11 @@ with np.nditer(
             cases[it.multi_index[0]]
         )
         # Adjust indices to skip None in betas
-        while any(
-            [
-                betas[g, *ind] == None 
-                for g in range(datasets.shape[0])
-            ]
-        ):
+        while any([betas[g, *ind] == None for g in range(datasets.shape[0])]):
             # increment cases if needed
             ind = (ind[0], ind[1] + 1)
             constant_indices = False
+
         ax.set_xlabel(ind[0] + 1)
         ax.set_ylabel(ind[1] + 1)
         for group in range(datasets.shape[0]):
@@ -134,10 +139,12 @@ with np.nditer(
                 color=colors[group],
                 alpha=.5
             )[0]
+
             if is_cdf:
                 y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
             else:
                 y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
+
             ax.plot(
                 x, y,
                 color=colors[group]
@@ -175,6 +182,7 @@ with np.nditer(
             labelleft=False,
             labelright=False,
         )
+        
         if constant_indices:
             if not is_left_col:
                 ax.set_ylabel("")
@@ -188,14 +196,26 @@ fig.supylabel("Case Count")
 
 
 ## * Kolmogrov-Smirnov to check theoretical validity within p = .05
-combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
-def kstest(x):
+def unwrapped_kstest(x: np.ndarray[stats.rv_continuous, float]):
+    '''
+    Apply single-sided kstest from NDArray. Necessary for using apply_along_axis
+    since we can't otherwise use two parallel arrays
+
+    x : NDArray
+        Of the form `[stats.rv_continuous, float64, ..., float64]`
+    
+    Returns
+    -------
+    KstestResult (see `scipy.stats`)
+    '''
     beta = x[0]
     if beta == None:
         return None
     data = x[1:].astype('f')
     return stats.kstest(data, beta.cdf)
-res["kstest"] = np.apply_along_axis(kstest, -1, combo)
+
+combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
+res["kstest"] = np.apply_along_axis(unwrapped_kstest, -1, combo)
 
 
 ## * Beta comparison
@@ -244,7 +264,7 @@ res["beta_diff"] = e_beta - t_beta
 print("saving...", flush=True)
 np.savetxt(results + "theoretical_cutoffs.csv", res["theoretical"][:, :, 0], delimiter=",", fmt="%.3f")
 np.savetxt(results + "theoretical_beta.csv", res["theoretical"][:, :, 1], delimiter=",", fmt="%.3f")
-np.savetxt(results + "e-t_beta_diff.csv", res["beta_diff"], delimiter=",", fmt="%.3f")
+np.savetxt(results + "e-t_beta_diff.csv", np.transpose(res["beta_diff"]), delimiter=",", fmt="%.3f")
 plt.savefig(
     f"{results}/{graph_form}.png",
     bbox_inches="tight",
