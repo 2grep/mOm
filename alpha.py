@@ -20,6 +20,9 @@ def compare(
     unassisted: np.ndarray[stats.rv_continuous], 
     alpha_error: float = .05
 ) -> tuple[np.ndarray[float], np.ndarray[float]]:
+    '''
+    Compare unassisted and assisted to get cutoff and beta
+    '''
     try:
         cutoff = unassisted.ppf(1 - alpha_error)
         beta_error = assisted.cdf(cutoff)
@@ -59,7 +62,9 @@ def get_args(data_root: str):
         "dims": (4, 6),     # Counts of rows and cols; Want observers x cases
         "ratio": (2, 1),    # Horizontal vs. vertical aspect ratio
         "scale": 1.4,
-        "histogram_bins": 30
+        "histogram_bins": 30,
+        "samples": 500,     # How many sample from the theoretical ditribution to take in graphing (basically resolution)
+        "is_cdf": False     # We could either analyze as CDF or PDF
     }
     args["alpha_error"] = .05
     return args
@@ -88,6 +93,7 @@ def get_graphs(
         betas,
         args: dict
 ) -> str:
+    ## * Initialize counters for rows and cols
     obs = np.flip(np.linspace(
         datasets.shape[1] - 1, 0, 
         num=args["dims"][0],
@@ -100,15 +106,20 @@ def get_graphs(
         endpoint=False,
         dtype=int
     ) # cases should count down (to match the top-left [0, 0] of axs)
+
+    ## * Create figure
     fig, axs = plt.subplots(
         ncols=args["dims"][0], 
         nrows=args["dims"][1], 
         figsize=(args["ratio"][0] * args["scale"] * args["dims"][0], args["ratio"][1] * args["scale"] * args["dims"][1]),
         layout="constrained"
     )
-    x = np.linspace(0, 1, num=500)
+
+    ## * Various tracking variables
+    x = np.linspace(0, 1, num=args["samples"])
     constant_indices = True
-    is_cdf = False
+
+    ## * Plot out histogram and function
     with np.nditer(
         axs,
         flags=[
@@ -144,12 +155,12 @@ def get_graphs(
                     range=(0, 1), 
                     align="mid",
                     density=True, # Draw normalized so area == 1
-                    cumulative=is_cdf, # Draw as CDF
+                    cumulative=args["is_cdf"], # Draw as CDF
                     color=args["colors"][group],
                     alpha=.5
                 )[0]
 
-                if is_cdf:
+                if args["is_cdf"]:
                     y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
                 else:
                     y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
@@ -159,7 +170,7 @@ def get_graphs(
                     color=args["colors"][group]
                 )
 
-    # Clear out excess axes display elements
+    ## * Clear out excess axes display elements
     with np.nditer(
         axs,
         flags=[
@@ -198,7 +209,8 @@ def get_graphs(
                 if not is_bottom_row:
                     ax.set_xlabel("")
 
-    graph_form = "CDF" if is_cdf else "PDF"
+    ## * Labeling
+    graph_form = "CDF" if args["is_cdf"] else "PDF"
     fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {graph_form}s")
     fig.supxlabel("Observer Count")
     fig.supylabel("Case Count")
@@ -228,27 +240,24 @@ def run_kstest(betas, datasets):
 
 def run_emperical_vs_theoretical_comparison(
         betas,
+        datasets,
         alpha_error: float
-):
+) -> tuple[np.ndarray, np.ndarray]:
     '''
     Returns
     -------
     Tuple of, in order, theoretical beta and cutoff along with difference between emperical and theoretical
     '''
     print("Running cutoffs...", flush=True)
-    theoretical = np.transpose(
-        np.apply_along_axis(
-            lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
-            0, 
-            betas, 
-            alpha_error=alpha_error
-        ),
-        (2, 1, 0)
+    theoretical = np.apply_along_axis(
+        lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
+        0, 
+        betas, 
+        alpha_error=alpha_error
     )
-    t_beta = np.transpose(theoretical[..., 1])
+    t_beta = theoretical[1]
 
     # Getting emperical beta values
-    datasets = np.sort(datasets)
     def _eppf(p: float, sorted_data: list[float]) -> float:
         return sorted_data[int(p * len(sorted_data))]
     eppf = np.vectorize(
@@ -263,6 +272,7 @@ def run_emperical_vs_theoretical_comparison(
         signature="(),(n)->()"
     )
 
+    datasets = np.sort(datasets)
     assisted = datasets[0]
     unassisted = datasets[1]
     cutoff = eppf(1 - alpha_error, unassisted)
@@ -271,10 +281,10 @@ def run_emperical_vs_theoretical_comparison(
     return (theoretical, beta_diff)
 
 def save(
-        directory, 
+        directory: str, 
         theoretical, 
         beta_difference, 
-        graph_form
+        graph_form: str
 ):
     print("saving...", flush=True)
     np.savetxt(directory + "theoretical_cutoffs.csv", theoretical[:, :, 0], delimiter=",", fmt="%.3f")
@@ -311,11 +321,20 @@ def main():
 
 
     ## * Beta comparison
-    res["theoretical"], res["beta_diff"] = run_emperical_vs_theoretical_comparison(betas, res["alpha_error"])
+    res["theoretical"], res["beta_diff"] = run_emperical_vs_theoretical_comparison(
+        betas, 
+        datasets, 
+        res["alpha_error"]
+    )
 
 
     ## * Save results
-    save(args["results_directory"], res["theoretical"], np.transpose(res["beta_diff"]), graph_form)
+    save(
+        args["results_directory"], 
+        np.transpose(res["theoretical"]), 
+        np.transpose(res["beta_diff"]), 
+        graph_form
+    )
 
 if __name__ == '__main__':
     main()
