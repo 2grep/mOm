@@ -46,232 +46,233 @@ def test() -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], float]:
     return (fits, fails, end - start)
 
 
-# def main():
-print("starting...")
-# Find the OPA cutoff D for alpha_error probability to be greater than D
-exp = "prostate_reader/"
-group = "_5class"
-root = "./data/"
-results = "./results/" + exp + "/"
-datasets = ["assisted", "unassisted"]
-colors = ["red", "green"]
-alpha_error = .05
-histogram_bins = 30
-res = {}
+def main():
+    ## * Setting arguments
+    print("starting...")
+    # Find the OPA cutoff D for alpha_error probability to be greater than D
+    exp = "prostate_reader/"
+    group = "_5class"
+    root = "./data/"
+    results = "./results/" + exp + "/"
+    datasets = ["assisted", "unassisted"]
+    colors = ["red", "green"]
+    alpha_error = .05
+    histogram_bins = 30
+    res = {}
 
-print("Fetching data...")
-datasets = [np.load(root + exp + dataset + group + ".npy") for dataset in datasets]
-datasets = np.transpose(np.asarray(datasets), (0, 3, 2, 1)) # (assisted/unassisted, observers, cases, surfaces)
-print("Got datasets")
+    print("Fetching data...")
+    datasets = [np.load(root + exp + dataset + group + ".npy") for dataset in datasets]
+    datasets = np.transpose(np.asarray(datasets), (0, 3, 2, 1)) # (assisted/unassisted, observers, cases, surfaces)
+    print("Got datasets")
 
-## * Fit each sample for observers x cases
-print("Running fits...", flush=True)
+    ## * Fit each sample for observers x cases
+    print("Running fits...", flush=True)
 
-# res["test"] = test()
-# betas = res["test"][0]
-betas = np.apply_along_axis(fit, -1, datasets)
+    # res["test"] = test()
+    # betas = res["test"][0]
+    betas = np.apply_along_axis(fit, -1, datasets)
 
-res["betas"] = betas
-print("Fits finished.")
+    res["betas"] = betas
+    print("Fits finished.")
 
 
-## * Visual confirmation of emperical to theoretical
-dims = (4, 6) # Want observers x cases
-ratio = (2, 1)
-scale = 1.4
-obs = np.flip(np.linspace(
-    datasets.shape[1] - 1, 0, 
-    num=dims[0],
-    endpoint=False,
-    dtype=int
-)) # obs should count up
-cases = np.linspace(
-    datasets.shape[2] - 1, 0,
-    num=dims[1],
-    endpoint=False,
-    dtype=int
-) # cases should count down (to match the top-left [0, 0] of axs)
-fig, axs = plt.subplots(
-    ncols=dims[0], 
-    nrows=dims[1], 
-    figsize=(ratio[0] * scale * dims[0], ratio[1] * scale * dims[1]),
-    layout="constrained"
-)
-x = np.linspace(0, 1, num=500)
-constant_indices = True
-is_cdf = False
-with np.nditer(
-    axs,
-    flags=[
-        "multi_index",
-        "refs_ok"
-    ],
-    op_flags=[
-        "readwrite"
-    ],
-    op_dtypes=matplotlib.axes._axes.Axes
-) as it:
-    for ax in it:
-        ax = ax.item()
+    ## * Visual confirmation of emperical to theoretical
+    dims = (4, 6) # Want observers x cases
+    ratio = (2, 1)
+    scale = 1.4
+    obs = np.flip(np.linspace(
+        datasets.shape[1] - 1, 0, 
+        num=dims[0],
+        endpoint=False,
+        dtype=int
+    )) # obs should count up
+    cases = np.linspace(
+        datasets.shape[2] - 1, 0,
+        num=dims[1],
+        endpoint=False,
+        dtype=int
+    ) # cases should count down (to match the top-left [0, 0] of axs)
+    fig, axs = plt.subplots(
+        ncols=dims[0], 
+        nrows=dims[1], 
+        figsize=(ratio[0] * scale * dims[0], ratio[1] * scale * dims[1]),
+        layout="constrained"
+    )
+    x = np.linspace(0, 1, num=500)
+    constant_indices = True
+    is_cdf = False
+    with np.nditer(
+        axs,
+        flags=[
+            "multi_index",
+            "refs_ok"
+        ],
+        op_flags=[
+            "readwrite"
+        ],
+        op_dtypes=matplotlib.axes._axes.Axes
+    ) as it:
+        for ax in it:
+            ax = ax.item()
 
-        ind = (
-            obs[it.multi_index[1]], 
-            cases[it.multi_index[0]]
-        )
-        # Adjust indices to skip None in betas
-        while any([betas[g, *ind] == None for g in range(datasets.shape[0])]):
-            # increment cases if needed
-            ind = (ind[0], ind[1] + 1)
-            constant_indices = False
-
-        ax.set_xlabel(ind[0] + 1)
-        ax.set_ylabel(ind[1] + 1)
-        for group in range(datasets.shape[0]):
-            # Finally, graph emperical (hist) and theoretical (plot) pdfs for each SARAPE surface
-            group_ind = (group, *ind)
-            hist = ax.hist(
-                datasets[group_ind[0], group_ind[1], group_ind[2]], 
-                bins=histogram_bins, 
-                range=(0, 1), 
-                align="mid",
-                density=True, # Draw normalized so area == 1
-                cumulative=is_cdf, # Draw as CDF
-                color=colors[group],
-                alpha=.5
-            )[0]
-
-            if is_cdf:
-                y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
-            else:
-                y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
-
-            ax.plot(
-                x, y,
-                color=colors[group]
+            ind = (
+                obs[it.multi_index[1]], 
+                cases[it.multi_index[0]]
             )
+            # Adjust indices to skip None in betas
+            while any([betas[g, *ind] == None for g in range(datasets.shape[0])]):
+                # increment cases if needed
+                ind = (ind[0], ind[1] + 1)
+                constant_indices = False
 
-# Clear out excess axes display elements
-with np.nditer(
-    axs,
-    flags=[
-        "multi_index",
-        "refs_ok"
-    ],
-    op_flags=[
-        "readwrite"
-    ],
-    op_dtypes=matplotlib.axes._axes.Axes
-) as it:
-    bottom_row = dims[1] - 1
-    left_col = 0
-    for ax in it:
-        # For some god forsaken reason, ax is a zero-dimensional array which python just DOESN'T want to treat right
-        # We use `ndarray.item()` to get the Python scalar value
-        ax = ax.item()
-        is_bottom_row = it.multi_index[0] == bottom_row
-        is_left_col = it.multi_index[1] == left_col
-        ax.tick_params(
-            axis="both",
-            which="both",
-            top=False,
-            bottom=is_bottom_row,
-            left=False,
-            right=False,
-            labeltop=False,
-            labelbottom=is_bottom_row,
-            labelleft=False,
-            labelright=False,
-        )
+            ax.set_xlabel(ind[0] + 1)
+            ax.set_ylabel(ind[1] + 1)
+            for group in range(datasets.shape[0]):
+                # Finally, graph emperical (hist) and theoretical (plot) pdfs for each SARAPE surface
+                group_ind = (group, *ind)
+                hist = ax.hist(
+                    datasets[group_ind[0], group_ind[1], group_ind[2]], 
+                    bins=histogram_bins, 
+                    range=(0, 1), 
+                    align="mid",
+                    density=True, # Draw normalized so area == 1
+                    cumulative=is_cdf, # Draw as CDF
+                    color=colors[group],
+                    alpha=.5
+                )[0]
+
+                if is_cdf:
+                    y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
+                else:
+                    y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
+
+                ax.plot(
+                    x, y,
+                    color=colors[group]
+                )
+
+    # Clear out excess axes display elements
+    with np.nditer(
+        axs,
+        flags=[
+            "multi_index",
+            "refs_ok"
+        ],
+        op_flags=[
+            "readwrite"
+        ],
+        op_dtypes=matplotlib.axes._axes.Axes
+    ) as it:
+        bottom_row = dims[1] - 1
+        left_col = 0
+        for ax in it:
+            # For some god forsaken reason, ax is a zero-dimensional array which python just DOESN'T want to treat right
+            # We use `ndarray.item()` to get the Python scalar value
+            ax = ax.item()
+            is_bottom_row = it.multi_index[0] == bottom_row
+            is_left_col = it.multi_index[1] == left_col
+            ax.tick_params(
+                axis="both",
+                which="both",
+                top=False,
+                bottom=is_bottom_row,
+                left=False,
+                right=False,
+                labeltop=False,
+                labelbottom=is_bottom_row,
+                labelleft=False,
+                labelright=False,
+            )
+            
+            if constant_indices:
+                if not is_left_col:
+                    ax.set_ylabel("")
+                if not is_bottom_row:
+                    ax.set_xlabel("")
+
+    graph_form = "CDF" if is_cdf else "PDF"
+    fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {graph_form}s")
+    fig.supxlabel("Observer Count")
+    fig.supylabel("Case Count")
+
+
+    ## * Kolmogrov-Smirnov to check theoretical validity within p = .05
+    def unwrapped_kstest(x: np.ndarray[stats.rv_continuous, float]):
+        '''
+        Apply single-sided kstest from NDArray. Necessary for using apply_along_axis
+        since we can't otherwise use two parallel arrays
+
+        x : NDArray
+            Of the form `[stats.rv_continuous, float64, ..., float64]`
         
-        if constant_indices:
-            if not is_left_col:
-                ax.set_ylabel("")
-            if not is_bottom_row:
-                ax.set_xlabel("")
+        Returns
+        -------
+        KstestResult (see `scipy.stats`)
+        '''
+        beta = x[0]
+        if beta == None:
+            return None
+        data = x[1:].astype('f')
+        return stats.kstest(data, beta.cdf)
 
-graph_form = "CDF" if is_cdf else "PDF"
-fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {graph_form}s")
-fig.supxlabel("Observer Count")
-fig.supylabel("Case Count")
-
-
-## * Kolmogrov-Smirnov to check theoretical validity within p = .05
-def unwrapped_kstest(x: np.ndarray[stats.rv_continuous, float]):
-    '''
-    Apply single-sided kstest from NDArray. Necessary for using apply_along_axis
-    since we can't otherwise use two parallel arrays
-
-    x : NDArray
-        Of the form `[stats.rv_continuous, float64, ..., float64]`
-    
-    Returns
-    -------
-    KstestResult (see `scipy.stats`)
-    '''
-    beta = x[0]
-    if beta == None:
-        return None
-    data = x[1:].astype('f')
-    return stats.kstest(data, beta.cdf)
-
-combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
-res["kstest"] = np.apply_along_axis(unwrapped_kstest, -1, combo)
+    combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
+    res["kstest"] = np.apply_along_axis(unwrapped_kstest, -1, combo)
 
 
-## * Beta comparison
-print("Running cutoffs...", flush=True)
-res["theoretical"] = np.transpose(
-    np.apply_along_axis(
-        lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
-        0, 
-        betas, 
-        alpha_error=alpha_error
-    ),
-    (2, 1, 0)
-)
-t_beta = np.transpose(res["theoretical"][..., 1])
+    ## * Beta comparison
+    print("Running cutoffs...", flush=True)
+    res["theoretical"] = np.transpose(
+        np.apply_along_axis(
+            lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
+            0, 
+            betas, 
+            alpha_error=alpha_error
+        ),
+        (2, 1, 0)
+    )
+    t_beta = np.transpose(res["theoretical"][..., 1])
 
-# Getting emperical beta values
-datasets = np.sort(datasets)
-def _eppf(
-    p: float, 
-    sorted_data: list[float]
-) -> float:
-    return sorted_data[int(p * len(sorted_data))]
-eppf = np.vectorize(
-    _eppf,
-    signature="(),(n)->()"
-)
+    # Getting emperical beta values
+    datasets = np.sort(datasets)
+    def _eppf(
+        p: float, 
+        sorted_data: list[float]
+    ) -> float:
+        return sorted_data[int(p * len(sorted_data))]
+    eppf = np.vectorize(
+        _eppf,
+        signature="(),(n)->()"
+    )
 
-def _ecdf(
-    x: float, 
-    sorted_data: list[float]
-) -> float:
-    return np.searchsorted(sorted_data, x) / len(sorted_data)
-ecdf = np.vectorize(
-    _ecdf,
-    signature="(),(n)->()"
-)
+    def _ecdf(
+        x: float, 
+        sorted_data: list[float]
+    ) -> float:
+        return np.searchsorted(sorted_data, x) / len(sorted_data)
+    ecdf = np.vectorize(
+        _ecdf,
+        signature="(),(n)->()"
+    )
 
-assisted = datasets[0]
-unassisted = datasets[1]
-cutoff = eppf(1 - alpha_error, unassisted)
-e_beta = ecdf(cutoff, assisted)
-res["beta_diff"] = e_beta - t_beta
+    assisted = datasets[0]
+    unassisted = datasets[1]
+    cutoff = eppf(1 - alpha_error, unassisted)
+    e_beta = ecdf(cutoff, assisted)
+    res["beta_diff"] = e_beta - t_beta
 
 
-## * Save results
-print("saving...", flush=True)
-np.savetxt(results + "theoretical_cutoffs.csv", res["theoretical"][:, :, 0], delimiter=",", fmt="%.3f")
-np.savetxt(results + "theoretical_beta.csv", res["theoretical"][:, :, 1], delimiter=",", fmt="%.3f")
-np.savetxt(results + "e-t_beta_diff.csv", np.transpose(res["beta_diff"]), delimiter=",", fmt="%.3f")
-plt.savefig(
-    f"{results}/{graph_form}.png",
-    bbox_inches="tight",
-    transparent=False,
-    dpi=1000
-)
-plt.show()
+    ## * Save results
+    print("saving...", flush=True)
+    np.savetxt(results + "theoretical_cutoffs.csv", res["theoretical"][:, :, 0], delimiter=",", fmt="%.3f")
+    np.savetxt(results + "theoretical_beta.csv", res["theoretical"][:, :, 1], delimiter=",", fmt="%.3f")
+    np.savetxt(results + "e-t_beta_diff.csv", np.transpose(res["beta_diff"]), delimiter=",", fmt="%.3f")
+    plt.savefig(
+        f"{results}/{graph_form}.png",
+        bbox_inches="tight",
+        transparent=False,
+        dpi=1000
+    )
+    plt.show()
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
