@@ -2,6 +2,7 @@ import matplotlib
 import numpy as np
 import scipy.stats as stats
 import time
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 def fit(data: np.ndarray) -> stats.rv_continuous:
@@ -58,13 +59,14 @@ def get_args(data_root: str):
     )
     args["results_directory"] = f"./results/{data_root}/"
     args["graphing"] = {
-        "colors": ["red", "green"],
+        "colors": ["red", "blue"],
+        "hatches": ["//", "\\\\"],
         "dims": (4, 6),     # Counts of rows and cols; Want observers x cases
         "ratio": (2, 1),    # Horizontal vs. vertical aspect ratio
         "scale": 1.4,
         "histogram_bins": 30,
         "samples": 500,     # How many sample from the theoretical ditribution to take in graphing (basically resolution)
-        "is_cdf": False     # We could either analyze as CDF or PDF
+        "is_cdf": True     # We could either analyze as CDF or PDF
     }
     args["alpha_error"] = .05
     return args
@@ -94,12 +96,14 @@ def get_graphs(
         args: dict
 ) -> str:
     ## * Initialize counters for rows and cols
-    obs = np.flip(np.linspace(
-        datasets.shape[1] - 1, 0, 
-        num=args["dims"][0],
-        endpoint=False,
-        dtype=int
-    )) # obs should count up
+    obs = np.flip(
+        np.linspace(
+            datasets.shape[1] - 1, 0, 
+            num=args["dims"][0],
+            endpoint=False,
+            dtype=int
+        )
+    ) # obs should count up
     cases = np.linspace(
         datasets.shape[2] - 1, 0,
         num=args["dims"][1],
@@ -138,6 +142,7 @@ def get_graphs(
                 obs[it.multi_index[1]], 
                 cases[it.multi_index[0]]
             )
+            print(it)
             # Adjust indices to skip None in betas
             while any([betas[g, *ind] == None for g in range(datasets.shape[0])]):
                 # increment cases if needed
@@ -149,16 +154,30 @@ def get_graphs(
             for group in range(datasets.shape[0]):
                 # Finally, graph emperical (hist) and theoretical (plot) pdfs for each SARAPE surface
                 group_ind = (group, *ind)
-                hist = ax.hist(
-                    datasets[group_ind[0], group_ind[1], group_ind[2]], 
-                    bins=args["histogram_bins"], 
-                    range=(0, 1), 
-                    align="mid",
-                    density=True, # Draw normalized so area == 1
-                    cumulative=args["is_cdf"], # Draw as CDF
-                    color=args["colors"][group],
-                    alpha=.5
-                )[0]
+                mpl.rcParams["hatch.color"] = args["colors"][group]
+
+                data = datasets[group_ind[0], group_ind[1], group_ind[2]]
+                edges = np.append(np.sort(data), 1)
+                vals = np.arange(data.size) / float(data.size)
+
+                ax.stairs(
+                    vals,
+                    edges,
+                    hatch=args["hatches"][group],
+                    color=args["colors"][group]
+                )
+                # hist = ax.hist(
+                #     datasets[group_ind[0], group_ind[1], group_ind[2]], 
+                #     bins=args["histogram_bins"], 
+                #     range=(0, 1), 
+                #     density=True, # Draw normalized so area == 1
+                #     align="mid",
+                #     cumulative=args["is_cdf"], # Draw as CDF
+                #     # color=args["colors"][group],
+                #     # alpha=.5,
+                #     fill=False,
+                #     hatch=args["hatches"][group]
+                # )[0]
 
                 if args["is_cdf"]:
                     y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
@@ -278,18 +297,24 @@ def run_emperical_vs_theoretical_comparison(
     cutoff = eppf(1 - alpha_error, unassisted)
     e_beta = ecdf(cutoff, assisted)
     beta_diff = e_beta - t_beta
-    return (theoretical, beta_diff)
+    emperical = np.stack([cutoff, e_beta], axis=0)
+    return (theoretical, emperical, beta_diff)
 
 def save(
         directory: str, 
+        betas,
         theoretical, 
+        emperical,
         beta_difference, 
         graph_form: str
 ):
     print("saving...", flush=True)
     np.savetxt(directory + "theoretical_cutoffs.csv", theoretical[:, :, 0], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "theoretical_beta.csv", theoretical[:, :, 1], delimiter=",", fmt="%.3f")
+    np.savetxt(directory + "emperical_cutoffs.csv", emperical[:, :, 0], delimiter=",", fmt="%.3f")
+    np.savetxt(directory + "emperical_beta.csv", emperical[:, :, 1], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "e-t_beta_diff.csv", beta_difference, delimiter=",", fmt="%.3f")
+    np.save(directory + "pure_betas.npy", betas)
     plt.savefig(
         directory + graph_form + ".png",
         bbox_inches="tight",
@@ -308,7 +333,8 @@ def main():
     datasets = get_data(args["data_paths"])
 
     ## * Fit each sample for observers x cases
-    res["betas"] = run_fits(datasets)
+    # res["betas"] = run_fits(datasets)
+    res["betas"] = np.load(args["results_directory"] + "pure_betas.npy", allow_pickle=True)
     betas = res["betas"]
 
 
@@ -317,21 +343,23 @@ def main():
 
 
     ## * Kolmogrov-Smirnov to check theoretical validity within p = .05
-    res["kstest"] = run_kstest(betas, datasets)
+    # res["kstest"] = run_kstest(betas, datasets)
 
 
     ## * Beta comparison
-    res["theoretical"], res["beta_diff"] = run_emperical_vs_theoretical_comparison(
+    res["theoretical"], res["emperical"], res["beta_diff"] = run_emperical_vs_theoretical_comparison(
         betas, 
         datasets, 
-        res["alpha_error"]
+        args["alpha_error"]
     )
 
 
     ## * Save results
     save(
         args["results_directory"], 
+        betas,
         np.transpose(res["theoretical"]), 
+        np.transpose(res["emperical"]), 
         np.transpose(res["beta_diff"]), 
         graph_form
     )

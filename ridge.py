@@ -50,10 +50,15 @@ def opa_ks_ridge(
     return null_pvalues
 
 def ks_flat(treatment, control):
-    null_pvalues = np.empty(treatment.shape[:-1])
+    '''
+    Check Kolmogrov-Smirnov 2-sided test for treatment and control
+    
+    Assumes `treatment` and `control` are of the same size
+    '''
+    pvalues = np.empty(treatment.shape[:-1])
     for i, (x, y) in enumerate(zip(treatment, control)):
-        null_pvalues[i] = stats.ks_2samp(x, y, alternative="two-sided", mode="auto").pvalue
-    return null_pvalues
+        pvalues[i] = stats.ks_2samp(x, y, alternative="two-sided", mode="auto").pvalue
+    return pvalues
 
 def run_ks_ridge(
         datasets,
