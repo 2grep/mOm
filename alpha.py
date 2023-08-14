@@ -115,12 +115,13 @@ def get_graphs(
     fig, axs = plt.subplots(
         ncols=args["dims"][0], 
         nrows=args["dims"][1], 
-        figsize=(args["ratio"][0] * args["scale"] * args["dims"][0], args["ratio"][1] * args["scale"] * args["dims"][1]),
+        figsize=(args["ratio"][0] * args["scale"] * args["dims"][0], 
+                args["ratio"][1] * args["scale"] * args["dims"][1]),
         layout="constrained"
     )
 
     ## * Various tracking variables
-    x = np.linspace(0, 1, num=args["samples"])
+    x = np.linspace(0, 1, num=args["samples"]) # * [0, 1] bc X is the proportion of agreement
     constant_indices = True
 
     ## * Plot out histogram and function
@@ -178,11 +179,11 @@ def get_graphs(
                 #     fill=False,
                 #     hatch=args["hatches"][group]
                 # )[0]
-
+                y = betas[group_ind[0], group_ind[1], group_ind[2]]
                 if args["is_cdf"]:
-                    y = betas[group_ind[0], group_ind[1], group_ind[2]].cdf(x)
+                    y = y.cdf(x)
                 else:
-                    y = betas[group_ind[0], group_ind[1], group_ind[2]].pdf(x)
+                    y = y.pdf(x)
 
                 ax.plot(
                     x, y,
@@ -214,13 +215,16 @@ def get_graphs(
                 which="both",
                 top=False,
                 bottom=is_bottom_row,
-                left=False,
+                left=is_left_col,
                 right=False,
                 labeltop=False,
                 labelbottom=is_bottom_row,
-                labelleft=False,
+                labelleft=is_left_col,
                 labelright=False,
             )
+            ax.spines[["right", "top"]].set_visible(False)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
             
             if constant_indices:
                 if not is_left_col:
