@@ -1,11 +1,15 @@
 import matplotlib
 import numpy as np
+from typing import Optional, Any
+import numpy.typing as npt
 import scipy.stats as stats
 import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-def fit(data: np.ndarray) -> stats.rv_continuous:
+type DistributionsArray = np.ndarray[Any, np.dtype[stats.rv_continuous]]
+
+def fit(data: np.ndarray) -> Optional[stats.rv_continuous]:
     """
     Fit data to beta distribution. Returns `None` if if gets an `Exception`
     """
@@ -17,8 +21,8 @@ def fit(data: np.ndarray) -> stats.rv_continuous:
         return None
 
 def compare(
-    assisted: np.ndarray[stats.rv_continuous], 
-    unassisted: np.ndarray[stats.rv_continuous], 
+    assisted: DistributionsArray, 
+    unassisted: DistributionsArray, 
     alpha_error: float = .05
 ) -> tuple[np.ndarray[float], np.ndarray[float]]:
     '''
@@ -31,7 +35,7 @@ def compare(
     except Exception as e:
         return None
 
-def test(datasets) -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], float]:
+def test(datasets) -> tuple[DistributionsArray, list[tuple[int]], float]:
     """
     Functionally equivalent (though slower) to just applying fit along the axes of datasets but gives more information about failure and timing
     """
@@ -53,6 +57,8 @@ def test(datasets) -> tuple[np.ndarray[stats.rv_continuous], list[tuple[int]], f
 def get_args(data_root: str):
     args = {}
     args["res"] = {}
+
+    # ! Can we just scrape the directory for all .npy files? And/or .csv?
     args["data_paths"] = (
         f"./data/{data_root}/assisted_5class.npy",
         f"./data/{data_root}/unassisted_5class.npy",
@@ -66,7 +72,7 @@ def get_args(data_root: str):
         "scale": 1.4,
         "histogram_bins": 30,
         "samples": 500,     # How many sample from the theoretical ditribution to take in graphing (basically resolution)
-        "is_cdf": True     # We could either analyze as CDF or PDF
+        "is_cdf": True      # We could either analyze as CDF or PDF
     }
     args["alpha_error"] = .05
     return args
@@ -78,7 +84,7 @@ def get_data(data_paths: list[str]):
     print("Got datasets")
     return datasets
 
-def run_fits(datasets):
+def run_fits(datasets: npt.ArrayLike) -> npt.NDArray:
     print("Running fits...")
 
     #                                                 Use one (1) of these (a b)
@@ -256,8 +262,11 @@ def run_kstest(betas, datasets):
         if beta == None:
             return None
         data = x[1:].astype('f')
-        return stats.kstest(data, beta.cdf)
+        return stats.kstest(data, beta.cdf).pvalue
 
+    # Reduce the 10,000 surfaces to 25 random surfaces for each (d, o, c)
+    # I am doing this to reduce n in kstest for more liberal p-values
+    datasets = np.apply_along_axis(np.random.choice, -1, datasets, 50, replace=False)
     combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
     return np.apply_along_axis(unwrapped_kstest, -1, combo)
 
@@ -305,20 +314,24 @@ def run_emperical_vs_theoretical_comparison(
     return (theoretical, emperical, beta_diff)
 
 def save(
-        directory: str, 
-        betas,
-        theoretical, 
-        emperical,
-        beta_difference, 
-        graph_form: str
+        directory: str,
+        graph_form: str,
+        betas: np.ndarray,
+        theoretical: np.ndarray,
+        emperical: np.ndarray,
+        beta_difference: np.ndarray,
+        kstest: np.ndarray = None,
 ):
     print("saving...", flush=True)
+    np.save(directory + "pure_betas.npy", betas)
     np.savetxt(directory + "theoretical_cutoffs.csv", theoretical[:, :, 0], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "theoretical_beta.csv", theoretical[:, :, 1], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "emperical_cutoffs.csv", emperical[:, :, 0], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "emperical_beta.csv", emperical[:, :, 1], delimiter=",", fmt="%.3f")
     np.savetxt(directory + "e-t_beta_diff.csv", beta_difference, delimiter=",", fmt="%.3f")
-    np.save(directory + "pure_betas.npy", betas)
+    if not kstest is None:
+        np.savetxt(directory + "kstest_assisted.csv", kstest[0, ...], delimiter=",", fmt="%.3f")
+        np.savetxt(directory + "kstest_unassisted.csv", kstest[1, ...], delimiter=",", fmt="%.3f")
     plt.savefig(
         directory + graph_form + ".png",
         bbox_inches="tight",
@@ -330,42 +343,46 @@ def save(
 def main():
     print("starting...")
 
+    global args
     args = get_args("prostate_reader")
     res = args["res"]
 
     ## * Fetch datasets
-    datasets = get_data(args["data_paths"])
+    datasets = get_data(args["data_paths"]) # (assisted/unassisted, observers, cases, surfaces) (aka. (d, o, c, s))
 
     ## * Fit each sample for observers x cases
     # res["betas"] = run_fits(datasets)
-    res["betas"] = np.load(args["results_directory"] + "pure_betas.npy", allow_pickle=True)
+    res["betas"] = np.load(args["results_directory"] + "pure_betas.npy", allow_pickle=True) # load from precomputed values for faster testing
     betas = res["betas"]
 
 
     ## * Visual confirmation of emperical to theoretical
+    print("Getting graphs...")
     graph_form = get_graphs(datasets, betas, args["graphing"])
 
 
     ## * Kolmogrov-Smirnov to check theoretical validity within p = .05
-    # res["kstest"] = run_kstest(betas, datasets)
+    print("Running Kolmogrov-Smirnov tests...")
+    res["kstest"] = run_kstest(betas, datasets)
 
 
     ## * Beta comparison
     res["theoretical"], res["emperical"], res["beta_diff"] = run_emperical_vs_theoretical_comparison(
-        betas, 
-        datasets, 
+        betas,
+        datasets,
         args["alpha_error"]
     )
 
 
     ## * Save results
     save(
-        args["results_directory"], 
-        betas,
-        np.transpose(res["theoretical"]), 
-        np.transpose(res["emperical"]), 
-        np.transpose(res["beta_diff"]), 
-        graph_form
+        args["results_directory"],
+        graph_form,
+        args["res"]["betas"],
+        np.transpose(args["res"]["theoretical"]),
+        np.transpose(args["res"]["emperical"]),
+        np.transpose(args["res"]["beta_diff"]),
+        np.transpose(args["res"]["kstest"], (0, 2, 1))
     )
 
 if __name__ == '__main__':
