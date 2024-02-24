@@ -1,9 +1,11 @@
 #!usr/bin/env python3
 import argparse
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, LinearLocator)
+from matplotlib.ticker import MultipleLocator
 import numpy as np
-import time
+import numpy.typing as npt
+from typing import Callable
+from types import SimpleNamespace
 import lib
 
 ## ARGUMENTS ##
@@ -15,24 +17,46 @@ import lib
 #       Progress: |█████████████████████████████████████████████-----| 90/100 Curve(s) Complete
 #       (https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020)
 
-parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
-parser.add_argument("-m", "--model", help="""Model for analysis:
-    onest: Observers Needed to Evaluate a Subjective Test,
-    ga: Generalized Accuracy -- future,
-    esi: Error Severity Index -- future""", 
-    dest="model", 
-    choices=[
-        "onest",
-        "sarape"
-    ], required=True)
-parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
-# TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
-parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
-parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels", nargs="*")
-parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
+# parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+# parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
+# parser.add_argument("-m", "--model", help="""Model for analysis:
+#     onest: Observers Needed to Evaluate a Subjective Test,
+#     ga: Generalized Accuracy -- future,
+#     esi: Error Severity Index -- future""", 
+#     dest="model", 
+#     choices=[
+#         "onest",
+#         "sarape"
+#     ], required=True)
+# parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
+# # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
+# parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
+# parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels", nargs="*")
+# parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
 
-args = parser.parse_args()
+def get_args():
+    return {
+        "dataset_names": [
+            "./data/prostate_reader/assisted_5class.csv",
+            "./data/prostate_reader/unassisted_5class.csv"
+        ],
+        # Must be valid matplotlib graphing color
+        "colors": [
+            "tab:blue",
+            "tab:red"
+        ],
+        "labels": [ 
+            "assisted",
+            "unassisted"
+        ],
+        "model": "sarape",
+        "describe": True,
+        "cache": False
+    }
+
+# args = parser.parse_args()
+args = get_args()
+args = SimpleNamespace(**args) # allows dictionary dot notation bc previous implementation was using that and I didn't want to change the code
 
 file_names = []
 file_exts = []
@@ -161,6 +185,43 @@ def onest(
         onest.append(curve)
     return np.array(onest, copy=False)
 
+def get_analyzed_data(
+        datasets: npt.NDArray,
+        analysis_method: Callable[[np.ndarray, int], np.ndarray],
+        unique_manifolds: int,
+        datasets_from_cache: bool,
+        cache: bool) -> npt.NDArray:
+    '''
+    Get analyzed data. Either the datasets were from a cached analysis and we just return that
+    or we run the ONEST analysis on the data
+    '''
+    if datasets_from_cache:
+        return datasets
+    cache_name_index = 0
+    analyses: list[np.ndarray] = []
+    for case_observer_matrix in datasets:
+        analysis = analysis_method(np.transpose(case_observer_matrix), unique_manifolds)
+        analyses.append(analysis)
+
+        if cache:
+            np.save(file_names[cache_name_index] + ".npy", analysis)
+            cache_name_index += 1
+
+    return np.asarray(analyses)
+
+def data_to_plot(
+        onest_analyses: npt.NDArray,
+        describe: bool) -> npt.NDArray:
+    if describe:
+        # Desribe as min, mean, max if desired
+        return np.dstack((
+            np.apply_along_axis(np.amin,    2, onest_analyses), 
+            np.apply_along_axis(np.average, 2, onest_analyses), 
+            np.apply_along_axis(np.amax,    2, onest_analyses)
+        ))
+
+    else:
+        return onest_analyses
 
 def select_method():
     args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
@@ -180,26 +241,11 @@ def run_onest(
         unique_curves: int = 1000
     ):
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
-    def get_base_data(datasets, datasets_from_cache, cache):
-        if not datasets_from_cache:
-            counter = 0
-            onest_analyses: list[np.ndarray] = []
-            for case_observer_matrix in datasets:
-                analysis = onest(np.transpose(case_observer_matrix), unique_curves)
-
-                onest_analyses.append(analysis)
-
-                if cache:
-                    np.save(file_names[counter] + ".npy", analysis)
-                    counter += 1
-
-            onest_analyses = np.asarray(onest_analyses)
-            # pyplot.Axes.plot calls for observers to be last
-            return np.transpose(onest_analyses, (0, 2, 1))
-        
-        else:
-            return args.datasets
-    onest_analyses = get_base_data(args.datasets, datasets_from_cache, args.cache)
+    # pyplot.Axes.plot calls for observers to be last
+    onest_analyses = np.transpose(
+        get_analyzed_data(args.datasets, onest, unique_curves, datasets_from_cache, args.cache),
+        (0, 2, 1)
+    )
 
     def data_to_plot(onest_analyses):
         if args.describe:
@@ -212,7 +258,7 @@ def run_onest(
 
         else:
             return onest_analyses
-    onest_curves = data_to_plot(onest_analyses)
+    onest_curves = data_to_plot(onest_analyses, args.describe)
 
     ## Plot each analysis
     def plot_curves(onest_curves):
@@ -252,27 +298,7 @@ def run_sarape(
         unique_surfaces: int = 10000,
         colors: list = ["coolwarm", "PiYG"]
     ):
-    def get_base_data():
-        if not datasets_from_cache:
-            counter = 0
-            case_onest_analyses: list[np.ndarray] = []
-
-            for case_observer_matrix in args.datasets:
-                single_analysis = sarape(
-                    np.transpose(case_observer_matrix),
-                    unique_surfaces
-                )
-
-                if args.cache:
-                    np.save(file_names[counter], np.asarray(single_analysis))
-                    counter += 1
-
-                case_onest_analyses.append(single_analysis)
-            return np.asarray(case_onest_analyses)
-
-        else:
-            return args.datasets
-    case_onest_analyses = get_base_data()
+    case_onest_analyses = get_analyzed_data(args.datasets, sarape, unique_surfaces, datasets_from_cache, args.cache)
 
     ## Description
     def data_to_plot(case_onest_analyses):
@@ -281,7 +307,8 @@ def run_sarape(
             dataset_surfaces = []
             for dataset in case_onest_analyses:
                 dataset_surfaces.append([
-                    np.amax(dataset, axis=0), 
+                    np.amax(dataset, axis=0),
+                    np.average(dataset, axis=0),
                     np.amin(dataset, axis=0)]
                 )
             return np.asarray(dataset_surfaces)
@@ -330,3 +357,9 @@ def run_sarape(
         )
         plt.show()
     plot_data(dataset_surfaces)
+
+def main():
+    select_method()
+
+if __name__ == "__main__":
+    main()
