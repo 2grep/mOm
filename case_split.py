@@ -3,30 +3,35 @@ import lib
 import matplotlib.pyplot as plt
 from ridge import ks_flat as opaks
 
-def main():
-    def get_args():
-        args = {}
-        args["colors"] = ["red", "green"]
-        args["datapaths"] = [
-            "./data/prostate_reader/assisted_5class.npy",
-            "./data/prostate_reader/unassisted_5class.npy"
-        ]
-        args["graphing"] = {
-            "scale": 2.5,
-            "ratio": (1, 1),
-        }
+def get_args():
+    args = {}
+    args["colors"] = ["red", "green"]
+    args["datapaths"] = [
+        "./data/prostate_reader/assisted_5class.npy",
+        "./data/prostate_reader/unassisted_5class.npy"
+    ]
+    args["graphing"] = {
+        "scale": 2.5,
+        "ratio": (1, 1),
+    }
 
-        args["is_case_centered"] = False
-        args["case_step"] = 1
-        args["num_graphs"] = 4
-        args["central_case"] = 43
+    args["is_case_centered"] = False
+    args["case_step"] = 1
+    args["num_graphs"] = 4
+    args["central_case"] = 43
 
-        return args
-    
+    return args
+
+def get_datasets(data_paths):
+    return np.asarray([
+        np.transpose(
+            lib.data_reader(path)
+        )
+    for path in data_paths])
+
+def main():    
     args = get_args()
 
-    def get_datasets(data_paths):
-        return np.asarray([np.transpose(lib.data_reader(path)) for path in data_paths])
     datasets = get_datasets(args["datapaths"])
 
     ## Setup `choices`
@@ -114,3 +119,6 @@ def main():
     plt.savefig("./results/case_split.png",
                 bbox_inches="tight", transparent=False, dpi=1000)
     # plt.show()
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,4 @@
-import matplotlib
+# import matplotlib # ? mpl.axes._axes.Axes
 import numpy as np
 from typing import Optional, Any
 import numpy.typing as npt
@@ -59,6 +59,7 @@ def get_args(data_root: str):
     args["res"] = {}
 
     # ! Can we just scrape the directory for all .npy files? And/or .csv?
+    # This was just the fastest way to test
     args["data_paths"] = (
         f"./data/{data_root}/assisted_5class.npy",
         f"./data/{data_root}/unassisted_5class.npy",
@@ -78,8 +79,12 @@ def get_args(data_root: str):
     return args
 
 def get_data(data_paths: list[str]):
+    '''
+    Get the sarapes from premade .npy file
+    '''
     print("Fetching data...")
     datasets = [np.load(data) for data in data_paths]
+    # datasets = [np.loadtxt(data, delimiter=',') for data in data_paths] # for .csv
     datasets = np.transpose(np.asarray(datasets), (0, 3, 2, 1)) # (assisted/unassisted, observers, cases, surfaces)
     print("Got datasets")
     return datasets
@@ -91,6 +96,7 @@ def run_fits(datasets: npt.ArrayLike) -> npt.NDArray:
     # res["test"] = test(datasets)                  # -+
     #                                                  |- a -
     # betas = res["test"][0]                        # -+
+    # ? What is -1 axis?
     betas = np.apply_along_axis(fit, -1, datasets)   # --- b -
 
     print("Fits finished.")
@@ -140,7 +146,7 @@ def get_graphs(
         op_flags=[
             "readwrite"
         ],
-        op_dtypes=matplotlib.axes._axes.Axes
+        op_dtypes=mpl.axes._axes.Axes
     ) as it:
         for ax in it:
             ax = ax.item()
@@ -206,7 +212,7 @@ def get_graphs(
         op_flags=[
             "readwrite"
         ],
-        op_dtypes=matplotlib.axes._axes.Axes
+        op_dtypes=mpl.axes._axes.Axes
     ) as it:
         bottom_row = args["dims"][1] - 1
         left_col = 0
@@ -322,6 +328,8 @@ def save(
         beta_difference: np.ndarray,
         kstest: np.ndarray = None,
 ):
+    # ! Make folder if not there
+
     print("saving...", flush=True)
     np.save(directory + "pure_betas.npy", betas)
     np.savetxt(directory + "theoretical_cutoffs.csv", theoretical[:, :, 0], delimiter=",", fmt="%.3f")
@@ -351,8 +359,8 @@ def main():
     datasets = get_data(args["data_paths"]) # (assisted/unassisted, observers, cases, surfaces) (aka. (d, o, c, s))
 
     ## * Fit each sample for observers x cases
-    # res["betas"] = run_fits(datasets)
-    res["betas"] = np.load(args["results_directory"] + "pure_betas.npy", allow_pickle=True) # load from precomputed values for faster testing
+    res["betas"] = run_fits(datasets)
+    # res["betas"] = np.load(args["results_directory"] + "pure_betas.npy", allow_pickle=True) # load from precomputed values for faster testing
     betas = res["betas"]
 
 

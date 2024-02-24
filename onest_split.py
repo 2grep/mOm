@@ -6,7 +6,8 @@ import random as random
 import lib
 import typing as typ
 
-# * This is basically deprecated by ridge.py except for getting the bigger histogram
+# This is basically deprecated by ridge.py except for getting the bigger histogram
+## * Extends functionality of ridge.py by giving bigger histograms
 
 # Max/min of observer slice
 def obs_range(

@@ -62,3 +62,42 @@ https://docs.google.com/document/d/1_v-9WWoWL7Q4XFFECHozLi_WRLNQETD1Z3ZbdIEET38/
 #    one knew which cases were textbook cases, one could treat them separately;
 #    but that is a difficult matter.” 
 #                                 -- Gwet’s Handbook of Inter-Rater ReLiability
+
+# Expected Folders and Setup
+- data/prostate_reader/assisted_5class.npy
+- data/prostate_reader/unassisted_5class.npy
+
+# Original Data
+- data/
+    - prostate_reader/
+        - assisted_5class.csv
+        - unassisted_5class.csv
+    - nottingham/
+        - mitosis.csv
+        - nottingham.csv
+        - pleomorphismus.csv
+        - tubulus.csv
+
+# TODO
+- Walk through the data folder for the data
+- How did I convert `.csv` to `.npy`?
+- Do better `get_args`
+- Automatically create sarapes in alpha.py:get_data
+- Choose consistent way to convert list to ndarray (note when other is necessary)
+
+- Cleanup
+- `pip3 freeze > requirements.txt`
+- includes `examples` folder
+    - Add
+        - prostate_reader (DOI: 10.1001/jamanetworkopen.2020.23267)
+        - nottingham (DOI: 10.1016/j.prp.2021.153718)
+        - [PDL1](https://cran.r-project.org/web/packages/ONEST/index.html) (doi:10.1038/s41379-020-0544-x)
+- Write up instructions on running some data from the beginning
+- Get dad to run PDL1 from instructions I write up
+
+```python
+for root, subdirs, files in os.walk(sys.argv[1]):
+        for filename in files:
+            path = os.path.join(root, filename)
+            nameBool, ext = nameCheck(path)
+```
