@@ -8,6 +8,9 @@ from typing import Callable
 from types import SimpleNamespace
 import lib
 
+# * This does the initial ONEST and CONTEST analyses to create the analyzed manifolds from the original CSV data
+# * and to create the graphs of slide for Basic ONEST procedure for Steiner's Reader Study (slide 32 as of 2024-02-24)
+
 ## ARGUMENTS ##
 # TODO: convert unique_curves and o_max to inputted values
 # TODO: add output file for resulting images and caches
@@ -211,15 +214,15 @@ def get_analyzed_data(
 
 def data_to_plot(
         onest_analyses: npt.NDArray,
+        manifolds_axis: int,
         describe: bool) -> npt.NDArray:
     if describe:
         # Desribe as min, mean, max if desired
-        return np.dstack((
-            np.apply_along_axis(np.amin,    2, onest_analyses), 
-            np.apply_along_axis(np.average, 2, onest_analyses), 
-            np.apply_along_axis(np.amax,    2, onest_analyses)
-        ))
-
+        return np.stack((
+            np.min(onest_analyses, axis=manifolds_axis),
+            np.average(onest_analyses, axis=manifolds_axis),
+            np.max(onest_analyses, axis=manifolds_axis),
+        ), axis=manifolds_axis)
     else:
         return onest_analyses
 
@@ -246,19 +249,7 @@ def run_onest(
         get_analyzed_data(args.datasets, onest, unique_curves, datasets_from_cache, args.cache),
         (0, 2, 1)
     )
-
-    def data_to_plot(onest_analyses):
-        if args.describe:
-            # Desribe as min, mean, max if desired
-            return np.dstack((
-                np.apply_along_axis(np.amin,    2, onest_analyses), 
-                np.apply_along_axis(np.average, 2, onest_analyses), 
-                np.apply_along_axis(np.amax,    2, onest_analyses)
-            ))
-
-        else:
-            return onest_analyses
-    onest_curves = data_to_plot(onest_analyses, args.describe)
+    onest_curves = data_to_plot(onest_analyses, 2, args.describe)
 
     ## Plot each analysis
     def plot_curves(onest_curves):
@@ -299,23 +290,7 @@ def run_sarape(
         colors: list = ["coolwarm", "PiYG"]
     ):
     case_onest_analyses = get_analyzed_data(args.datasets, sarape, unique_surfaces, datasets_from_cache, args.cache)
-
-    ## Description
-    def data_to_plot(case_onest_analyses):
-        if args.describe:
-            # Get min and max
-            dataset_surfaces = []
-            for dataset in case_onest_analyses:
-                dataset_surfaces.append([
-                    np.amax(dataset, axis=0),
-                    np.average(dataset, axis=0),
-                    np.amin(dataset, axis=0)]
-                )
-            return np.asarray(dataset_surfaces)
-        
-        else:
-            return case_onest_analyses
-    dataset_surfaces = data_to_plot(case_onest_analyses)
+    dataset_surfaces = data_to_plot(case_onest_analyses, 1, args.describe)
 
     def plot_data(dataset_surfaces):
         _, ax = plt.subplots(subplot_kw={"projection": "3d"})
