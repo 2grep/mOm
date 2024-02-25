@@ -4,6 +4,9 @@ import typing as typ
 import scipy.stats as stats
 import lib
 
+# * Answer the question of, given these envelopes of min-max OPA curves, where do they becomes different?
+# * Creates a CSV file
+
 def opa_hist_ridge(
         treatment: np.ndarray,
         control: np.ndarray,

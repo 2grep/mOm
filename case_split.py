@@ -3,6 +3,9 @@ import lib
 import matplotlib.pyplot as plt
 from ridge import ks_flat as opaks
 
+# * Create the histograms of, for example, 18-, 23-, 28-, and 33-Cases
+# * As seen on the slide for a few representative distributions for certain case counts occuring across OPA bins for 6 observers (slide 69 as of 2024-02-24)
+
 def get_args():
     args = {}
     args["colors"] = ["red", "green"]

@@ -9,6 +9,8 @@ import typing as typ
 # This is basically deprecated by ridge.py except for getting the bigger histogram
 ## * Extends functionality of ridge.py by giving bigger histograms
 
+# * Generates the many histograms that we first see on the slide for histogram subplots: Observers & OPA (slide 60 as of 2024-02-24)
+
 # Max/min of observer slice
 def obs_range(
         dataset: np.ndarray
