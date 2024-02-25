@@ -78,6 +78,10 @@ https://docs.google.com/document/d/1_v-9WWoWL7Q4XFFECHozLi_WRLNQETD1Z3ZbdIEET38/
         - pleomorphismus.csv
         - tubulus.csv
 
+# Instructions
+The analysis starts with `onest_analysis.py` to perform the ONEST and/or CONTEST analyses on the CSV data.
+Make sure to cache this to create the appropriate NPYs used in the other programs.
+
 # TODO
 - Walk through the data folder for the data
 - How did I convert `.csv` to `.npy`?
@@ -101,3 +105,9 @@ for root, subdirs, files in os.walk(sys.argv[1]):
             path = os.path.join(root, filename)
             nameBool, ext = nameCheck(path)
 ```
+
+# Future Considerations
+We calculate the OPA as the proportion of the number of observer agreements to total number of cases. There may be multiple ways to calculate this. The [FDA discuss overall percent agreement][fda-opa] in a 2-class positive vs. negative context.
+
+[fda-opa]: https://www.fda.gov/files/medical%20devices/published/Guidance-for-Industry-and-FDA-Staff---Statistical-Guidance-on-Reporting-Results-from-Studies-Evaluating-Diagnostic-Tests-%28PDF-Version%29.pdf
+[slides]: https://docs.google.com/presentation/d/1b7S_4nVgq0DsrQRkU7vEaCQtnOKafUGa/edit#slide=id.g22e7b4ae203_0_166
