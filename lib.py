@@ -1,21 +1,21 @@
+from typing import TypeVar, Any, Generator, Sequence
+import numpy.typing as npt
 import math
 import os
 import numpy.random as random
 import numpy as np
 from collections import deque
-import typing as typ
-import time
 
 ## Type Variables ##
-T = typ.TypeVar('T')
+T = TypeVar('T')
 
 ## Functions ##
 
 def bucket(
-        dataset: np.ndarray,
-        num_buckets: int,
-        range: typ.Union[tuple[int, int], list[int]] = (0, 1)
-    ) -> np.ndarray:
+    dataset: npt.NDArray[np.float_],
+    num_buckets: int,
+    range: tuple[int, int] | list[int] = (0, 1)
+) -> npt.NDArray[np.float_]:
     '''
     Bucket dataset into num_buckets, assumes layer of dataset to bucket on is final 
     (i.e. if dataset.shape = (19, 240, 1000), will bucket into (19, 240, num_buckets)).
@@ -38,10 +38,10 @@ def bucket(
     )
 
 def data_reader(
-        fname: str,
-        names: list[str] = [],
-        exts: list[str] = []
-    ) -> np.ndarray:
+    fname: str,
+    names: list[str] = [],
+    exts: list[str] = []
+) -> npt.NDArray[Any]:
     '''
     Read in data from file.
     Appends file names and extensions to names and exts repectively if specified.
@@ -58,10 +58,10 @@ def data_reader(
         return data
     raise Exception(f"{fext} is an unrecognized file extension for `fname`.")
 
-def random_unique_permutations(
-    arr: np.ndarray,
-    call_count: int = None
-) -> typ.Generator[np.ndarray, None, None]:
+def random_unique_permutations[T: np.generic](
+    arr: npt.NDArray[T],
+    call_count: int | None = None
+) -> Generator[npt.NDArray[T], None, None]:
     '''
     Generate random, unique (i.e. will never return sequences with the exact same order) 
     permutations of arr.
@@ -89,7 +89,7 @@ def random_unique_permutations(
     prev_add = prev.add
     max = math.factorial(len(arr))
 
-    def next(rng, arr):
+    def next(rng: random.Generator, arr: npt.NDArray[T]):
         rng.shuffle(arr)
 
         hasharr = arr.data.tobytes()
@@ -111,7 +111,7 @@ def random_unique_permutations(
 
             yield next(rng, arr)
 
-def all_match(match_list: typ.Iterable) -> bool:
+def all_match(match_list: Sequence[Any]) -> bool:
     '''
     Check if all in `match_list` are the same value
     '''
