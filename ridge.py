@@ -1,3 +1,4 @@
+import numpy.typing as npt
 import numpy as np
 import random as random
 import typing as typ
@@ -8,10 +9,10 @@ import lib
 # * Creates a CSV file
 
 def opa_hist_ridge(
-        treatment: np.ndarray,
-        control: np.ndarray,
-        certainty: float = 9
-    ) -> np.ndarray:
+    treatment: npt.NDArray[np.float_],
+    control: npt.NDArray[np.float_],
+    certainty: float = 9
+) -> npt.NDArray[np.int_]:
     '''
     Find "ridge" values for the treatment and control histograms
     (i.e. where `treatment >= control * certainty`).
@@ -24,10 +25,10 @@ def opa_hist_ridge(
     return np.argmax(is_valid, axis=1)
 
 def opa_ks_ridge(
-        treatment: np.ndarray,
-        control: np.ndarray,
-        certainty: float = .95
-    ) -> np.ndarray:
+    treatment: npt.NDArray[np.float_],
+    control: npt.NDArray[np.float_],
+    certainty: float = .95
+) -> npt.NDArray[np.float_]:
     '''
     Use the two-sample Kolmogorov-Smirnov test to identify the ridge of cases
 
@@ -52,32 +53,32 @@ def opa_ks_ridge(
 
     return null_pvalues
 
-def ks_flat(treatment, control):
+def ks_flat(treatment: npt.NDArray[np.float_], control: npt.NDArray[np.float_]) -> npt.NDArray[np.float_]:
     '''
     Check Kolmogrov-Smirnov 2-sided test for treatment and control
     
     Assumes `treatment` and `control` are of the same size
     '''
     pvalues = np.empty(treatment.shape[:-1])
-    for i, (x, y) in enumerate(zip(treatment, control)):
-        pvalues[i] = stats.ks_2samp(x, y, alternative="two-sided", mode="auto").pvalue
+    for i, (t, c) in enumerate(zip(treatment, control)):
+        pvalues[i] = stats.ks_2samp(t, c, alternative="two-sided", method="auto").pvalue # type: ignore
     return pvalues
 
 def run_ks_ridge(
-        datasets,
-        fname = "ridge",
-        **kwargs
-    ):
+    datasets: npt.NDArray[np.float_],
+    fname: str = "ridge",
+    **kwargs
+):
     ridge = opa_ks_ridge(datasets[0], datasets[1], **kwargs)
     np.savetxt(fname + ("" if ".csv" == fname[-4:] else ".csv"), ridge, fmt="%d", delimiter=",")
 
 
 def run_hist_ridge(
-        datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]],
-        fname: str = "ridge",
-        opa_slices: int = 10,
-        **kwargs
-    ) -> np.ndarray:
+    datasets: tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]] | list[npt.NDArray[np.float_]],
+    fname: str = "ridge",
+    opa_slices: int = 10,
+    **kwargs
+) -> npt.NDArray[np.int_]:
     '''
     Calculate "ridge" of treatment and control. In other words, find the number of cases 
     required for validation with an amount of certainty for each observer and opa.
