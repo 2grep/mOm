@@ -1,3 +1,6 @@
+from typing import TypeVar
+import numpy.typing as npt
+import matplotlib.axes
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
@@ -11,10 +14,12 @@ import typing as typ
 
 # * Generates the many histograms that we first see on the slide for histogram subplots: Observers & OPA (slide 60 as of 2024-02-24)
 
+Axes = TypeVar("Axes", bound=np.object_)
+
 # Max/min of observer slice
 def obs_range(
-        dataset: np.ndarray
-    ) -> np.ndarray:
+    dataset: npt.NDArray[np.float_]
+) -> npt.NDArray[np.float_]:
     '''
     Calculate mins and maxs of dataset.
     '''
@@ -23,9 +28,9 @@ def obs_range(
     return np.dstack((mins, maxs))
 
 def opa_hist(
-        dataset: np.ndarray,
-        opa_slices: int
-    ) -> np.ndarray:
+    dataset: npt.NDArray[np.float_],
+    opa_slices: int
+) -> npt.NDArray[np.float_]:
     '''
     Calculate histogram of dataset for observers and slices.
     '''
@@ -34,10 +39,10 @@ def opa_hist(
 # opa_hist_ridge(stats_low, stats_high, .9)
 
 def opa_hist_ridge(
-        treatment: np.ndarray, 
-        control: np.ndarray, 
-        certainty: int
-    ) -> np.ndarray:
+    treatment: npt.NDArray[np.float_], 
+    control: npt.NDArray[np.float_], 
+    certainty: int
+):
     '''
     Find "ridge" values for the treatment and control histograms (i.e. where `treatment >= control * certainty`).
     '''
@@ -47,11 +52,11 @@ def opa_hist_ridge(
     return np.apply_along_axis(np.argmax, 1, is_valid)
 
 def run_dataset(
-        dataset: np.ndarray, 
-        axs: plt.Axes,
-        opa_slices: int = 3, 
-        color = "gray"
-    ) -> None:
+    dataset: npt.NDArray[np.float_], 
+    axs: npt.NDArray[Axes],
+    opa_slices: int = 3, 
+    color = "gray"
+):
     '''
     Run dataset for either histogram or normal ditribution graph.
     '''
@@ -71,10 +76,10 @@ def run_dataset(
 
         for opa in range(opa_slices):
             axis_slice = opa + 1
-            ax = axs[axis_slice][axis_col]
+            ax: matplotlib.axes.Axes = axs[axis_slice][axis_col]
             ax.hist(
                 bins, 
-                bins=bins, 
+                bins=bins, # type: ignore
                 weights=hist[opa, :, obs], 
                 align="left", 
                 color=color, 
@@ -82,22 +87,23 @@ def run_dataset(
             )
     return np.amax(hist)
 
-def run_ridge(
-        datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]], 
-        observer_slices: int = 3, 
-        opa_slices: int = 3,
-        certainty: int = 9
-    ) -> None:
-    '''
-    datasets: treatment, control
-    '''
+# ! Deprecated I believe
+# def run_ridge(
+#     datasets: typ.Union[typ.Tuple[np.ndarray, np.ndarray], list[np.ndarray]], 
+#     observer_slices: int = 3, 
+#     opa_slices: int = 3,
+#     certainty: int = 9
+# ):
+#     '''
+#     datasets: treatment, control
+#     '''
 
-    # ranges = [obs_range(dataset, observer_slices) for dataset in datasets]
-    treatment = opa_hist(datasets[0], observer_slices, opa_slices, buckets=opa_slices)
-    control = opa_hist(datasets[1], observer_slices, opa_slices, buckets=opa_slices)
-    ridge = np.transpose(opa_hist_ridge(treatment, control, certainty))[::-1]
+#     # ranges = [obs_range(dataset, observer_slices) for dataset in datasets]
+#     treatment = opa_hist(datasets[0], observer_slices, opa_slices, buckets=opa_slices)
+#     control = opa_hist(datasets[1], observer_slices, opa_slices, buckets=opa_slices)
+#     ridge = np.transpose(opa_hist_ridge(treatment, control, certainty))[::-1]
 
-    np.savetxt("ridge.csv", ridge, fmt="%d", delimiter=",")
+#     np.savetxt("ridge.csv", ridge, fmt="%d", delimiter=",")
 
 exp = "prostate_reader/"
 group = "_5class"
