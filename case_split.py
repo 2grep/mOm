@@ -1,3 +1,4 @@
+from typing import Any, Iterable
 import numpy as np
 import lib
 import matplotlib.pyplot as plt
@@ -6,7 +7,7 @@ from ridge import ks_flat as opaks
 # * Create the histograms of, for example, 18-, 23-, 28-, and 33-Cases
 # * As seen on the slide for a few representative distributions for certain case counts occuring across OPA bins for 6 observers (slide 69 as of 2024-02-24)
 
-def get_args():
+def get_args() -> dict[str, Any]:
     args = {}
     args["colors"] = ["red", "green"]
     args["datapaths"] = [
@@ -25,7 +26,7 @@ def get_args():
 
     return args
 
-def get_datasets(data_paths):
+def get_datasets(data_paths: Iterable[str]):
     return np.asarray([
         np.transpose(
             lib.data_reader(path)
@@ -51,9 +52,9 @@ def main():
 
     num_choices = len(choices)
 
-    scale = 2.5
+    # scale = 2.5
     ratio = args["graphing"]["ratio"][1] / args["graphing"]["ratio"][0]
-    fig, axs = plt.subplots(
+    _, axs = plt.subplots(
         ncols = num_choices, 
         figsize = (
             num_choices * args["graphing"]["scale"], 
@@ -121,7 +122,6 @@ def main():
     plt.tight_layout()
     plt.savefig("./results/case_split.png",
                 bbox_inches="tight", transparent=False, dpi=1000)
-    # plt.show()
 
 if __name__ == "__main__":
     main()
