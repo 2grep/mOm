@@ -1,9 +1,9 @@
 #!usr/bin/env python3
-import argparse
+from typing import Any
+import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 import numpy as np
-import numpy.typing as npt
 from typing import Callable
 from types import SimpleNamespace
 import lib
@@ -12,32 +12,7 @@ import lib
 # * and to create the graphs of slide for Basic ONEST procedure for Steiner's Reader Study (slide 32 as of 2024-02-24)
 
 ## ARGUMENTS ##
-# TODO: convert unique_curves and o_max to inputted values
-# TODO: add output file for resulting images and caches
-# TODO: add verbosity option
-# 0 - print nothing, just make the graph
-# 1 - print curve generation progress (preferably as loading bar)
-#       Progress: |█████████████████████████████████████████████-----| 90/100 Curve(s) Complete
-#       (https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020)
-
-# parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-# parser.add_argument("dataset_names", metavar="data", help="Path for data to run analysis on", nargs="+")
-# parser.add_argument("-m", "--model", help="""Model for analysis:
-#     onest: Observers Needed to Evaluate a Subjective Test,
-#     ga: Generalized Accuracy -- future,
-#     esi: Error Severity Index -- future""", 
-#     dest="model", 
-#     choices=[
-#         "onest",
-#         "sarape"
-#     ], required=True)
-# parser.add_argument("-d", "--statistical_analysis", help="Only graph lines for max, min, and mean of each number of observers", dest="describe", action="store_true")
-# # TODO: restrict color choices to `matplotlib` colors and colormaps (colormaps only for 3d models)
-# parser.add_argument("-c", "--color", help="matplotlib colors for each set of data; loops number of colors is less than number of data files", dest="colors", nargs="+", default=["tab:gray"])
-# parser.add_argument("-l", "--labels", help="Assign labels for each dataset to use in legend", dest="labels", nargs="*")
-# parser.add_argument("--cache", help="If flagged, caches data after processing", dest="cache", action="store_true")
-
-def get_args():
+def get_args() -> dict[str, Any]:
     return {
         "dataset_names": [
             "./data/prostate_reader/assisted_5class.csv",
@@ -58,14 +33,13 @@ def get_args():
     }
 
 # args = parser.parse_args()
-args = get_args()
-args = SimpleNamespace(**args) # allows dictionary dot notation bc previous implementation was using that and I didn't want to change the code
+args = SimpleNamespace(**get_args()) # allows dictionary dot notation bc previous implementation was using that and I didn't want to change the code
 
 file_names = []
 file_exts = []
 
 ## FUNCTIONS ##
-def overall_proportion_agreement(observer_case_matrix: np.ndarray) -> float:
+def overall_proportion_agreement(observer_case_matrix: npt.NDArray[Any]) -> float:
     '''
     Parameters
     ----------
@@ -81,14 +55,14 @@ def overall_proportion_agreement(observer_case_matrix: np.ndarray) -> float:
     -------
     OPA : proportion of cases with complete observer agreement
     '''
-    case_agreements = np.apply_along_axis(lib.all_match, 0, observer_case_matrix) # match along columns
+    case_agreements = np.apply_along_axis(lib.all_match, 0, observer_case_matrix) # type: ignore # match along columns
     #  number of case agreements / number of cases
     return case_agreements.sum() / observer_case_matrix.shape[1]
 
 def sarape(
-        observer_case_matrix: np.ndarray, 
-        unique_surfaces: int
-    ) -> np.ndarray:
+    observer_case_matrix: npt.NDArray[Any], 
+    unique_surfaces: int
+) -> npt.NDArray[np.float_]:
     # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
     Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from
@@ -147,9 +121,9 @@ def sarape(
     return np.array(space, copy=False)
 
 def onest(
-        observer_case_matrix: np.ndarray, 
-        unique_curves: int
-    ) -> np.ndarray:
+    observer_case_matrix: npt.NDArray[Any], 
+    unique_curves: int
+) -> npt.NDArray[np.float_]:
     '''
     Parameters
     ----------
@@ -188,18 +162,19 @@ def onest(
         onest.append(curve)
     return np.array(onest, copy=False)
 
-def get_analyzed_data(
-        datasets: npt.NDArray,
-        analysis_method: Callable[[np.ndarray, int], np.ndarray],
-        unique_manifolds: int,
-        datasets_from_cache: bool,
-        cache: bool) -> npt.NDArray:
+def get_analyzed_data[T: np.generic](
+    datasets: npt.NDArray[T],
+    analysis_method: Callable[[npt.NDArray[T], int], npt.NDArray[np.float_]],
+    unique_manifolds: int,
+    datasets_from_cache: bool,
+    cache: bool
+) -> npt.NDArray[np.float_]:
     '''
     Get analyzed data. Either the datasets were from a cached analysis and we just return that
     or we run the ONEST analysis on the data
     '''
     if datasets_from_cache:
-        return datasets
+        return datasets # type: ignore
     cache_name_index = 0
     analyses: list[np.ndarray] = []
     for case_observer_matrix in datasets:
@@ -213,15 +188,16 @@ def get_analyzed_data(
     return np.asarray(analyses)
 
 def data_to_plot(
-        onest_analyses: npt.NDArray,
-        manifolds_axis: int,
-        describe: bool) -> npt.NDArray:
+    onest_analyses: npt.NDArray[np.float_],
+    manifolds_axis: int,
+    describe: bool
+) -> npt.NDArray[np.float_]:
     if describe:
         # Desribe as min, mean, max if desired
         return np.stack((
-            np.min(onest_analyses, axis=manifolds_axis),
+            np.amin(onest_analyses, axis=manifolds_axis),
             np.average(onest_analyses, axis=manifolds_axis),
-            np.max(onest_analyses, axis=manifolds_axis),
+            np.amax(onest_analyses, axis=manifolds_axis),
         ), axis=manifolds_axis)
     else:
         return onest_analyses
@@ -240,9 +216,9 @@ def select_method():
         print(f"Unknown model '{args.model}'") 
 
 def run_onest(
-        datasets_from_cache: bool = True, 
-        unique_curves: int = 1000
-    ):
+    datasets_from_cache: bool = True, 
+    unique_curves: int = 1000
+):
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     # pyplot.Axes.plot calls for observers to be last
     onest_analyses = np.transpose(
@@ -285,10 +261,10 @@ def run_onest(
     plot_curves(onest_curves)
 
 def run_sarape(
-        datasets_from_cache: bool = True, 
-        unique_surfaces: int = 10000,
-        colors: list = ["coolwarm", "PiYG"]
-    ):
+    datasets_from_cache: bool = True, 
+    unique_surfaces: int = 10000,
+    colors: list = ["coolwarm", "PiYG"]
+):
     case_onest_analyses = get_analyzed_data(args.datasets, sarape, unique_surfaces, datasets_from_cache, args.cache)
     dataset_surfaces = data_to_plot(case_onest_analyses, 1, args.describe)
 
