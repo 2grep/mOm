@@ -82,12 +82,78 @@ None of the errors herein are mine, the editors are conspiring against me.
         - tubulus.csv
 
 # Instructions
+> Instructions last updated 2024-02-27
+> These have not been tested for anything other than comparing exactly 2 sets of data at a time
+
 The analysis starts with `onest_analysis.py` to perform the ONEST and/or CONTEST analyses on the CSV data.
 Make sure to cache this to create the appropriate NPYs used in the other programs.
 
+## Getting Started
+These instructions assume you have the commands `git` and `python3` installed on your machine. Furthermore, it assumes you have a basic understanding of the terminal and navigation therein.
+
+Open a terminal and navigate to the folder you want this repository to be under. Copy this repository with the following command:
+```bash
+git clone https://github.com/grepgrok/CONTEST.git
+```
+
+In the terminal, open the `CONTEST` folder. From here on, subsequent terminal commans will assume the terminal is currently in the `CONTEST` folder.
+
+## CONTEST/ONEST Analysis
+1. Place `.csv` data files in the same folder. This folder should be in the folder `./data/`.
+    - For the sake of example, these instructions will call the folder `my_data` and the files `treatment.csv` and `control.csv`.
+    > Both sets of data should have the same shape (for example, 20 x 2) and be ordered as cases by observers
+2. Create a `./results/my_data` folder.
+- Here is an example of the file system structure so far:
+    ```
+    CONTEST/
+    ├── data/
+    │   └── my_data/
+    │       ├── treatment.csv
+    │       └── control.csv
+    ├── results/
+    │   └── my_data/
+    └── README
+    ```
+3. Open `onest_analysis.py` and scroll to the `get_args` function on line 15.
+    1. Change the `dataset_names` on lines 18 and 19 to the paths to the two files. Be mindful of the fact that Python requires a comma `,` at the end of the first file path on line 18.
+        ```python
+        "dataset_names": [
+            "./data/my_data/treatment.csv",
+            "./data/my_data/control.csv"
+        ]
+        ```
+    2. Adjust the `colors` and `labels` on lines 22 through 29 as desired. These accordingly control the color and label associated with `treatment.csv` and `control.csv` on the plot of the analysis.
+        > The values under `colors` must be [named matplotlib colors][mpl-colors]. The values under `labels` may be any strings.
+    3. Set `method` to `onest` or `contest` for the ONEST or CONTEST analyses accordlingly. Note that the subsequent analyses below require this to be `contest`.
+    4. If you would like to plot all manifolds of the analysis, set `describe` on line 31 to `False`. Conversely, setting `describe` to `True` will show only the minimum, maximum, and mean of the envelope in the ONEST method and only the minimum and maximum in the CONTEST method.
+    5. Make sure `cache` is set to `True`
+4. In the terminal, run the following command:
+```bash
+python3 onest_analysis.py
+```
+
+The file system structure should now look something like this:
+```
+CONTEST/
+├── data/
+│   └── my_data/
+│       ├── treatment.csv
+│       ├── treatment.npy
+│       ├── control.csv
+│       └── control.npy
+├── results/
+│   ├── my_data/
+│   └── onest.png
+└── README
+```
+
+Subsequent analyses especially require the prescence of the `.npy` file created by this analysis: `./data/my_data/treatment.npy` and `./data/my_data/control.npy`. Also, they assume the executed analysis was the CONTEST analysis (`"method": "contest"` above in Step 3.3).
+
+[mpl-colors]: https://matplotlib.org/stable/gallery/color/named_colors.html
+
 # TODO
 - Walk through the data folder for the data
-- How did I convert `.csv` to `.npy`?
+- Rename all instances of sarape to contest if possible
 - Do better `get_args`
 - Automatically create sarapes in alpha.py:get_data
 - Choose consistent way to convert list to ndarray (note when other is necessary)

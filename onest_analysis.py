@@ -27,9 +27,9 @@ def get_args() -> dict[str, Any]:
             "assisted",
             "unassisted"
         ],
-        "model": "sarape",
+        "method": "onest",
         "describe": True,
-        "cache": False
+        "cache": True
     }
 
 # args = parser.parse_args()
@@ -59,13 +59,13 @@ def overall_proportion_agreement(observer_case_matrix: npt.NDArray[Any]) -> floa
     #  number of case agreements / number of cases
     return case_agreements.sum() / observer_case_matrix.shape[1]
 
-def sarape(
+def contest(
     observer_case_matrix: npt.NDArray[Any], 
     unique_surfaces: int
 ) -> npt.NDArray[np.float_]:
     # TODO: What does "unique" surfaces mean? Define uniqueness.
     '''
-    Calculate SARAPE model on `case_observer_matrix` to generate `unique_surfaces` number of samples from
+    Calculate CONTEST method on `case_observer_matrix` to generate `unique_surfaces` number of samples from
     the full space of samples. 
 
     Parameters
@@ -84,7 +84,7 @@ def sarape(
     
     Returns
     -------
-    sarape : surfaces calculated with a shape of `(unique surfaces, cases, total observers - 1)`;
+    contest : surfaces calculated with a shape of `(unique surfaces, cases, total observers - 1)`;
                 does NOT gaurentee a specific order to the final OPAs
     '''
     # Generators for observers and cases
@@ -206,14 +206,14 @@ def select_method():
     args.datasets = np.asarray([lib.data_reader(set, names=file_names, exts=file_exts) for set in args.dataset_names])
     datasets_from_cache = any(ext in file_exts for ext in [".pkl", ".npy"])
 
-    if args.model == "onest":
+    if args.method == "onest":
         run_onest(datasets_from_cache)
 
-    elif args.model == "sarape":
-        run_sarape(datasets_from_cache)
+    elif args.method == "contest":
+        run_contest(datasets_from_cache)
 
     else:
-        print(f"Unknown model '{args.model}'") 
+        print(f"Unknown method '{args.method}'") 
 
 def run_onest(
     datasets_from_cache: bool = True, 
@@ -260,12 +260,12 @@ def run_onest(
         plt.show()
     plot_curves(onest_curves)
 
-def run_sarape(
+def run_contest(
     datasets_from_cache: bool = True, 
     unique_surfaces: int = 10000,
     colors: list = ["coolwarm", "PiYG"]
 ):
-    case_onest_analyses = get_analyzed_data(args.datasets, sarape, unique_surfaces, datasets_from_cache, args.cache)
+    case_onest_analyses = get_analyzed_data(args.datasets, contest, unique_surfaces, datasets_from_cache, args.cache)
     dataset_surfaces = data_to_plot(case_onest_analyses, 1, args.describe)
 
     def plot_data(dataset_surfaces):
@@ -301,7 +301,7 @@ def run_sarape(
 
         ax.view_init(azim=45, elev=30)
         plt.savefig(
-            "./results/sarape.png", 
+            "./results/contest.png", 
             bbox_inches="tight", 
             transparent=False,
             dpi=1000
