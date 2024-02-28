@@ -27,7 +27,7 @@ def get_args() -> dict[str, Any]:
             "assisted",
             "unassisted"
         ],
-        "method": "onest",
+        "method": "contest",
         "describe": True,
         "cache": True
     }

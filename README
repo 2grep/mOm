@@ -127,10 +127,13 @@ In the terminal, open the `CONTEST` folder. From here on, subsequent terminal co
     3. Set `method` to `onest` or `contest` for the ONEST or CONTEST analyses accordlingly. Note that the subsequent analyses below require this to be `contest`.
     4. If you would like to plot all manifolds of the analysis, set `describe` on line 31 to `False`. Conversely, setting `describe` to `True` will show only the minimum, maximum, and mean of the envelope in the ONEST method and only the minimum and maximum in the CONTEST method.
     5. Make sure `cache` is set to `True`
+    6. Advanced: The number of unique manifolds may be adjusted: change the default value for `unique_curves` on line 220 for ONEST; change `unique_surfaces` on line 265 for CONTEST. Larger numbers may be more accurate but will take longer to compute. See [Thoughts and Notes](#thoughts-and-notes) below for commentary on this.
 4. In the terminal, run the following command:
 ```bash
 python3 onest_analysis.py
 ```
+
+This may take some time, feel free to get some coffee.
 
 The file system structure should now look something like this:
 ```
@@ -150,6 +153,12 @@ CONTEST/
 Subsequent analyses especially require the prescence of the `.npy` file created by this analysis: `./data/my_data/treatment.npy` and `./data/my_data/control.npy`. Also, they assume the executed analysis was the CONTEST analysis (`"method": "contest"` above in Step 3.3).
 
 [mpl-colors]: https://matplotlib.org/stable/gallery/color/named_colors.html
+
+### Running Already Analyzed Data
+Since running the analysis can take a lot of time, you can re-run the plotting after obtaining the cached `.npy` files by simply replacing the `.csv` with `.npy` in the `dataset_names` on lines 18 and 19. The program will skip the analysis part, significantly speeding up graphical analysis.
+
+# Thoughts and Notes
+As described in the [original paper][onest-paper], the ONEST/CONTEST manifolds are (theoretically) random and unique permutations of the observers (and cases). This means that, for 20 observers and 240 cases, there should be $19!$ (about $1.2 \times 10^{17}$) ONEST curves. Likewise, there should be $19! \cdot 240!$ (about $4.9 \times 10^{485}$) CONTEST surfaces. In practice, the number of CONTEST surfaces is bounded above by the respective number of ONEST curves. This is because we get the observers and cases for a surface at the same time (see `onest_analysis.py:102`). Also, if the number of unique manifolds is set greater than the factorial of one less than the number of observers, the code is liable to enter an infinite loop trying to find the next set of observers for a surface.
 
 # TODO
 - Walk through the data folder for the data
