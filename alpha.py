@@ -1,60 +1,69 @@
-# import matplotlib # ? mpl.axes._axes.Axes
+# import matplotlib # ? mpl.axes._axes.Axes alpha.py:153
 import numpy as np
-from typing import Optional, Any
+from typing import Optional, Any, TypeVar
 import numpy.typing as npt
 import scipy.stats as stats
-import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-type DistributionsArray = np.ndarray[Any, np.dtype[stats.rv_continuous]]
+# Attempts at typing were made, it turns out to be very complicated
+FrozenRV = np.object_
+T = TypeVar("T")
+NPOptional = T | np.object_
 
-def fit(data: np.ndarray) -> Optional[stats.rv_continuous]:
+def fit(data: npt.NDArray[np.float_]) -> Optional[npt.NDArray[FrozenRV]]:
     """
-    Fit data to beta distribution. Returns `None` if if gets an `Exception`
+    Fit data to beta distribution.
+
+    Parameters: data : Numpy NDArray of floats
+    Returns: Numpy NDArray of `stats.rv_frozen` or `None`
+        Returns `None` instead of raising for exceptions
     """
     try:
         params = stats.beta.fit(data)
-        return stats.beta(*params)
+        return stats.beta(*params) # type: ignore
     except Exception as e:
         print("Failed fit, returning `None`: ", e)
         return None
 
-def compare(
-    assisted: DistributionsArray, 
-    unassisted: DistributionsArray, 
-    alpha_error: float = .05
-) -> tuple[np.ndarray[float], np.ndarray[float]]:
+def compare(assisted: stats.rv_frozen, unassisted: stats.rv_frozen, alpha_error: float = .05) -> Optional[tuple[float, float]]:
     '''
     Compare unassisted and assisted to get cutoff and beta
+
+    Parameters: assisted : `stats.rv_frozen`
+                unassisted : `stats.rv_frozen`
+                alpha_error : `float`
+    Returns: tuple of floats or `None`
+        Returns `None` instead of raising for exceptions
     '''
     try:
-        cutoff = unassisted.ppf(1 - alpha_error)
-        beta_error = assisted.cdf(cutoff)
+        cutoff: float = unassisted.ppf(1 - alpha_error)
+        beta_error: float = assisted.cdf(cutoff)
         return (cutoff, beta_error)
-    except Exception as e:
+    except Exception as _:
         return None
 
-def test(datasets) -> tuple[DistributionsArray, list[tuple[int]], float]:
-    """
-    Functionally equivalent (though slower) to just applying fit along the axes of datasets but gives more information about failure and timing
-    """
-    start = time.time()
-    fits = np.empty_like(datasets[..., 0], dtype=stats.rv_continuous)
-    fails = []
-    for i in range(datasets.shape[0]):
-        for j in range(datasets.shape[1]):
-            for k in range(datasets.shape[2]):
-                try:
-                    fits[i, j, k] = fit(datasets[i, j, k])
-                except Exception as e:
-                    print(f"Fail on ({i}, {j}, {k}): {e}")
-                    fails.append((i, j, k))
-    end = time.time()
-    return (fits, fails, end - start)
+# ! I believe this is deprecated
+# def test(datasets) -> tuple[DistributionsArray, list[tuple[int]], float]:
+#     """
+#     Functionally equivalent (though slower) to just applying fit along the axes of datasets but gives more information about failure and timing
+#     """
+#     start = time.time()
+#     fits = np.empty_like(datasets[..., 0], dtype=stats.rv_continuous)
+#     fails = []
+#     for i in range(datasets.shape[0]):
+#         for j in range(datasets.shape[1]):
+#             for k in range(datasets.shape[2]):
+#                 try:
+#                     fits[i, j, k] = fit(datasets[i, j, k])
+#                 except Exception as e:
+#                     print(f"Fail on ({i}, {j}, {k}): {e}")
+#                     fails.append((i, j, k))
+#     end = time.time()
+#     return (fits, fails, end - start)
 
 
-def get_args(data_root: str):
+def get_args(data_root: str) -> dict[str, Any]:
     args = {}
     args["res"] = {}
 
@@ -78,18 +87,17 @@ def get_args(data_root: str):
     args["alpha_error"] = .05
     return args
 
-def get_data(data_paths: list[str]):
+def get_data(data_paths: list[str]) -> npt.NDArray[Any]:
     '''
-    Get the sarapes from premade .npy file
+    Get the sarapes from the analysis's .npy file
     '''
     print("Fetching data...")
     datasets = [np.load(data) for data in data_paths]
-    # datasets = [np.loadtxt(data, delimiter=',') for data in data_paths] # for .csv
     datasets = np.transpose(np.asarray(datasets), (0, 3, 2, 1)) # (assisted/unassisted, observers, cases, surfaces)
     print("Got datasets")
     return datasets
 
-def run_fits(datasets: npt.ArrayLike) -> npt.NDArray:
+def run_fits(datasets: npt.NDArray[np.float_]) -> npt.NDArray[FrozenRV]:
     print("Running fits...")
 
     #                                                 Use one (1) of these (a b)
@@ -97,16 +105,12 @@ def run_fits(datasets: npt.ArrayLike) -> npt.NDArray:
     #                                                  |- a -
     # betas = res["test"][0]                        # -+
     # ? What is -1 axis?
-    betas = np.apply_along_axis(fit, -1, datasets)   # --- b -
+    betas: npt.NDArray[FrozenRV] = np.apply_along_axis(fit, -1, datasets) # type: ignore  # --- b -
 
     print("Fits finished.")
     return betas
 
-def get_graphs(
-        datasets,
-        betas,
-        args: dict
-) -> str:
+def get_graphs(datasets, betas, args: dict) -> str:
     ## * Initialize counters for rows and cols
     obs = np.flip(
         np.linspace(
@@ -144,12 +148,12 @@ def get_graphs(
             "refs_ok"
         ],
         op_flags=[
-            "readwrite"
+            "readwrite" # type: ignore # !
         ],
-        op_dtypes=mpl.axes._axes.Axes
+        op_dtypes=mpl.axes._axes.Axes # type: ignore # !
     ) as it:
         for ax in it:
-            ax = ax.item()
+            ax = ax.item() # type: ignore # !
 
             ind = (
                 obs[it.multi_index[1]], 
@@ -210,16 +214,16 @@ def get_graphs(
             "refs_ok"
         ],
         op_flags=[
-            "readwrite"
+            "readwrite" # type: ignore # !
         ],
-        op_dtypes=mpl.axes._axes.Axes
+        op_dtypes=mpl.axes._axes.Axes # type: ignore # !
     ) as it:
         bottom_row = args["dims"][1] - 1
         left_col = 0
         for ax in it:
             # For some god forsaken reason, ax is a zero-dimensional array which python just DOESN'T want to treat right
             # We use `ndarray.item()` to get the Python scalar value
-            ax = ax.item()
+            ax = ax.item() # type: ignore # !
             is_bottom_row = it.multi_index[0] == bottom_row
             is_left_col = it.multi_index[1] == left_col
             ax.tick_params(
@@ -251,8 +255,14 @@ def get_graphs(
     fig.supylabel("Case Count")
     return graph_form
 
-def run_kstest(betas, datasets):
-    def unwrapped_kstest(x: np.ndarray[stats.rv_continuous, float]):
+def run_kstest(betas: npt.NDArray[FrozenRV], datasets: npt.NDArray[np.float_]) -> npt.NDArray[NPOptional[np.float_]]:
+    '''
+    Parameters: betas : ndarray of `rv_frozen`
+                datasets : ndarray of `float`
+    Returns: ndarray of (`float` or `None`)
+        `None` occurs where `betas` had `None`
+    '''
+    def unwrapped_kstest(x: npt.NDArray) -> Optional[np.float_]:
         '''
         Apply single-sided kstest from NDArray. Necessary for using apply_along_axis
         since we can't otherwise use two parallel arrays
@@ -260,9 +270,9 @@ def run_kstest(betas, datasets):
         x : NDArray
             Of the form `[stats.rv_continuous, float64, ..., float64]`
         
-        Returns
-        -------
-        KstestResult (see `scipy.stats`)
+        Returns: `float` or `None`
+            KstestResult pvalue (see `scipy.stats`)
+            Returns `None` if the `stats.rv_continuous` is `None`
         '''
         beta = x[0]
         if beta == None:
@@ -274,13 +284,13 @@ def run_kstest(betas, datasets):
     # I am doing this to reduce n in kstest for more liberal p-values
     datasets = np.apply_along_axis(np.random.choice, -1, datasets, 50, replace=False)
     combo = np.concatenate((betas[..., np.newaxis], datasets), axis=-1)
-    return np.apply_along_axis(unwrapped_kstest, -1, combo)
+    return np.apply_along_axis(unwrapped_kstest, -1, combo) # type: ignore
 
 def run_emperical_vs_theoretical_comparison(
-        betas,
-        datasets,
-        alpha_error: float
-) -> tuple[np.ndarray, np.ndarray]:
+    betas: npt.NDArray[FrozenRV],
+    datasets: npt.NDArray[np.float_],
+    alpha_error: float
+) -> tuple[npt.NDArray[NPOptional[np.float_]], npt.NDArray[np.float_], npt.NDArray[np.float_]]:
     '''
     Returns
     -------
@@ -288,22 +298,22 @@ def run_emperical_vs_theoretical_comparison(
     '''
     print("Running cutoffs...", flush=True)
     theoretical = np.apply_along_axis(
-        lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error),
+        lambda betas, alpha_error=.05: compare(*betas, alpha_error=alpha_error), # type: ignore
         0, 
-        betas, 
+        betas,  
         alpha_error=alpha_error
     )
-    t_beta = theoretical[1]
+    t_beta: npt.NDArray[np.float_] = theoretical[1]
 
     # Getting emperical beta values
-    def _eppf(p: float, sorted_data: list[float]) -> float:
+    def _eppf(p: float, sorted_data: npt.NDArray[np.float_]) -> np.float_:
         return sorted_data[int(p * len(sorted_data))]
     eppf = np.vectorize(
         _eppf,
         signature="(),(n)->()"
     )
 
-    def _ecdf(x: float, sorted_data: list[float]) -> float:
+    def _ecdf(x: float, sorted_data: list[float]) -> np.float_:
         return np.searchsorted(sorted_data, x) / len(sorted_data)
     ecdf = np.vectorize(
         _ecdf,
@@ -311,22 +321,22 @@ def run_emperical_vs_theoretical_comparison(
     )
 
     datasets = np.sort(datasets)
-    assisted = datasets[0]
-    unassisted = datasets[1]
-    cutoff = eppf(1 - alpha_error, unassisted)
-    e_beta = ecdf(cutoff, assisted)
+    assisted: npt.NDArray[np.float_] = datasets[0]
+    unassisted: npt.NDArray[np.float_] = datasets[1]
+    cutoff: npt.NDArray[np.float_] = eppf(1 - alpha_error, unassisted)
+    e_beta: npt.NDArray[np.float_] = ecdf(cutoff, assisted)
     beta_diff = e_beta - t_beta
     emperical = np.stack([cutoff, e_beta], axis=0)
     return (theoretical, emperical, beta_diff)
 
 def save(
-        directory: str,
-        graph_form: str,
-        betas: np.ndarray,
-        theoretical: np.ndarray,
-        emperical: np.ndarray,
-        beta_difference: np.ndarray,
-        kstest: np.ndarray = None,
+    directory: str,
+    graph_form: str,
+    betas: npt.NDArray,
+    theoretical: npt.NDArray,
+    emperical: npt.NDArray,
+    beta_difference: npt.NDArray,
+    kstest: npt.NDArray | None = None,
 ):
     # ! Make folder if not there
 
