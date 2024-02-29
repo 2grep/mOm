@@ -89,11 +89,16 @@ The analysis starts with `onest_analysis.py` to perform the ONEST and/or CONTEST
 Make sure to cache this to create the appropriate NPYs used in the other programs.
 
 ## Getting Started
-These instructions assume you have the commands `git` and `python3` installed on your machine. Furthermore, it assumes you have a basic understanding of the terminal and navigation therein.
+These instructions assume you have the commands `git`, `python3`, and `pip3` installed on your machine. Furthermore, it assumes you have a basic understanding of the terminal and navigation therein.
 
 Open a terminal and navigate to the folder you want this repository to be under. Copy this repository with the following command:
 ```bash
 git clone https://github.com/grepgrok/CONTEST.git
+```
+
+Install the requirements with the following command:
+```bash
+pip3 install -r requirements.txt
 ```
 
 In the terminal, open the `CONTEST` folder. From here on, subsequent terminal commans will assume the terminal is currently in the `CONTEST` folder.
