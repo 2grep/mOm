@@ -1,7 +1,6 @@
 # Output
 results/
 log/
-*.txt
 
 # data files
 data/
