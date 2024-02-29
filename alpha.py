@@ -26,7 +26,7 @@ def fit(data: npt.NDArray[np.float_]) -> Optional[npt.NDArray[FrozenRV]]:
         print("Failed fit, returning `None`: ", e)
         return None
 
-def compare(assisted: stats.rv_frozen, unassisted: stats.rv_frozen, alpha_error: float = .05) -> Optional[tuple[float, float]]:
+def compare(assisted, unassisted, alpha_error: float = .05) -> Optional[tuple[float, float]]:
     '''
     Compare unassisted and assisted to get cutoff and beta
 
