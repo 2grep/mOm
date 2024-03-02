@@ -77,6 +77,8 @@ root/
 ```
 > Note that file structure diagrams following will be rooted in `CONTEST` and only include the files relevant at that point in the instructions (typically excluding `.venv`)
 
+Once you are done with executing the code in this repository, you may execute the command `deactive` to deactivate the environment. The environment may be reactivated at any time with the command in step (3) above.
+
 ### Install Dependencies
 From `root/CONTEST`, install the requirements with the following command:
 ```bash
