@@ -1,3 +1,6 @@
+# Preface
+None of the errors herein are mine, the editors are conspiring against me.
+
 # Expected Folders and Setup
 - data/prostate_reader/assisted_5class.npy
 - data/prostate_reader/unassisted_5class.npy
@@ -21,20 +24,68 @@ The analysis starts with `onest_analysis.py` to perform the ONEST and/or CONTEST
 Make sure to cache this to create the appropriate NPYs used in the other programs.
 
 ## Getting Started
-These instructions assume you have the commands `git`, `python3`, and `pip3` installed on your machine. Furthermore, it assumes you have a basic understanding of the terminal and navigation therein.
+These instructions assume you have the commands [`git`][git-download] and [`python3.12`][python3.12-download] installed on your machine. If you do not have `python3.12`, you may download it [directly][python3.12-download] or as a standalone program in most package managers. Furthermore, we assume you have a basic understanding of the terminal and navigation therein.
 
-Open a terminal and navigate to the folder you want this repository to be under. Copy this repository with the following command:
+Open a terminal and navigate to the folder you want this repository to be under (for the sake of example, these instructions will call said folder `root`). From `root`, copy this repository with SSH with the following command:
+```bash
+git clone git@github.com:grepgrok/CONTEST.git
+```
+
+or with HTTPS:
 ```bash
 git clone https://github.com/grepgrok/CONTEST.git
 ```
 
-Install the requirements with the following command:
+This should create the following file structure:
+```
+root/
+└── CONTEST/
+    ├── .gitignore
+    ├── LICENSE
+    ├── README
+    └── ...
+```
+
+[git-download]: https://git-scm.com/downloads
+[python3.12-download]: https://www.python.org/downloads/release/python-3122/
+
+### Setup Virtual Environment
+While not strictly necessary, it is highly recommended to run the code in this repository under a virtual environment. If you do *not* want to use a venv, skip straight to [Install Dependencies](#-install-dependencies). For more thorough instructions, see [the official `venv` documentation][venv-docs]. Here we give a basic overview of what is needed in a bash shell:
+1. Navigate to `root/CONTEST`
+2. Create the virtual environment: Run `python3.12 -m venv .venv`
+3. Activate it: `source .venv/bin/activate`
+4. Check that it was activated properly: `which pip3` should print `path/to/root/CONTEST/.venv/bin/pip3`
+
+The file structure should resemble the following:
+```
+root/
+└── CONTEST/
+    ├── .gitignore
+    ├── .venv/
+    │   ├── bin/
+    │   │   ├── activate
+    │   │   ├── pip3
+    │   │   ├── python3.12
+    │   │   ├── python
+    │   │   └── ...
+    │   ├── include
+    │   ├── lib
+    │   └── pyenv.cfg
+    ├── LICENSE
+    ├── README
+    └── ...
+```
+> Note that file structure diagrams following will be rooted in `CONTEST` and only include the files relevant at that point in the instructions (typically excluding `.venv`)
+
+### Install Dependencies
+From `root/CONTEST`, install the requirements with the following command:
 ```bash
 pip3 install -r requirements.txt
 ```
 
-In the terminal, open the `CONTEST` folder. From here on, subsequent terminal commans will assume the terminal is currently in the `CONTEST` folder.
+In the terminal, navigate to the `CONTEST` folder. From here on, subsequent terminal commans will assume the terminal is currently in the `CONTEST` folder.
 
+[venv-docs]: https://docs.python.org/3/library/venv.html#creating-virtual-environments
 ## CONTEST/ONEST Analysis
 1. Place `.csv` data files in the same folder. This folder should be in the folder `./data/`.
     - For the sake of example, these instructions will call the folder `my_data` and the files `treatment.csv` and `control.csv`.
@@ -49,7 +100,9 @@ In the terminal, open the `CONTEST` folder. From here on, subsequent terminal co
     │       └── control.csv
     ├── results/
     │   └── my_data/
-    └── README
+    ├── README
+    ├── onest_analysis.py
+    └── ...
     ```
 3. Open `onest_analysis.py` and scroll to the `get_args` function on line 15.
     1. Change the `dataset_names` on lines 18 and 19 to the paths to the two files. Be mindful of the fact that Python requires a comma `,` at the end of the first file path on line 18.
@@ -67,7 +120,7 @@ In the terminal, open the `CONTEST` folder. From here on, subsequent terminal co
     6. Advanced: The number of unique manifolds may be adjusted: change the default value for `unique_curves` on line 220 for ONEST; change `unique_surfaces` on line 265 for CONTEST. Larger numbers may be more accurate but will take longer to compute. See [Thoughts and Notes](#thoughts-and-notes) below for commentary on this.
 4. In the terminal, run the following command:
 ```bash
-python3 onest_analysis.py
+python onest_analysis.py
 ```
 
 This may take some time, feel free to get some coffee.
@@ -84,7 +137,9 @@ CONTEST/
 ├── results/
 │   ├── my_data/
 │   └── onest.png
-└── README
+├── README
+├── onest_analysis.py
+└── ...
 ```
 
 Subsequent analyses especially require the prescence of the `.npy` file created by this analysis: `./data/my_data/treatment.npy` and `./data/my_data/control.npy`. Also, they assume the executed analysis was the CONTEST analysis (`"method": "contest"` above in Step 3.3).
@@ -118,6 +173,7 @@ The graphing of the CONTEST analysis can be very odd and glitchy. This is a [doc
 - Choose consistent style of docstring
 - Figure out a consistent style of execution workflow (or decide to give up on it)
 - Add detailed docstrings with parameter and return types
+- Make sure eveything sends to the same results directory
 
 - Cleanup
 - `pip3 freeze > requirements.txt`
