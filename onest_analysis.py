@@ -15,8 +15,8 @@ import lib
 def get_args() -> dict[str, Any]:
     return {
         "dataset_names": [
-            "./data/prostate_reader/assisted_5class.csv",
-            "./data/prostate_reader/unassisted_5class.csv"
+            "./data/my_data/treatment.csv",
+            "./data/my_data/control.csv"
         ],
         # Must be valid matplotlib graphing color
         "colors": [
@@ -217,7 +217,7 @@ def select_method():
 
 def run_onest(
     datasets_from_cache: bool = True, 
-    unique_curves: int = 1000
+    unique_curves: int = 1000 #Change this value for curves
 ):
     ## Convert case_observer matrices to OPAs (i.e. One set (each item in dataset_onest_analyses) of curves for each dataset)
     # pyplot.Axes.plot calls for observers to be last
@@ -262,7 +262,7 @@ def run_onest(
 
 def run_contest(
     datasets_from_cache: bool = True, 
-    unique_surfaces: int = 10000,
+    unique_surfaces: int = 10, #change this for surfaces. Set to 10 for debugging. Recommend 10000 for actual analysis
     colors: list = ["coolwarm", "PiYG"]
 ):
     case_onest_analyses = get_analyzed_data(args.datasets, contest, unique_surfaces, datasets_from_cache, args.cache)
