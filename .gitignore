@@ -3,7 +3,7 @@ results/
 log/
 
 # data files
-data/
+data/mydata
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
