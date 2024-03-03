@@ -91,7 +91,10 @@ In the terminal, navigate to the `CONTEST` folder. From here on, subsequent term
 ## CONTEST/ONEST Analysis
 1. Place `.csv` data files in the same folder. This folder should be in the folder `./data/`.
     - For the sake of example, these instructions will call the folder `my_data` and the files `treatment.csv` and `control.csv`.
-    > Both sets of data should have the same shape (for example, 20 x 2) and be ordered as cases by observers
+    > There are a few assumptions made about the datasets that should be ensured ahead of time:
+    > 1. They have the same dimensions (e.g. both are 240 cases by 20 observers) with each row being a "case"
+    > 2. The file only contains numbers in CSV format. Remove any column and row labels.
+    > 3. Remove anything that is otherwise *not* data on how the observers graded the cases. Remove any data on ground truth, model prediction, treatment type, etc. from the `.csv` files.
 2. Create a `./results/my_data` folder.
 - Here is an example of the file system structure so far:
     ```
