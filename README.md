@@ -153,7 +153,6 @@ The graphing of the CONTEST analysis can be very odd and glitchy. This is a [doc
 
 ## TODO
 - Walk through the data folder for the data
-- Rename all instances of sarape to contest if possible
 - Do better `get_args`
 - Automatically create sarapes in alpha.py:get_data
 - Choose consistent way to convert list to ndarray (note when other is necessary)

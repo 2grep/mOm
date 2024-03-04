@@ -89,7 +89,7 @@ def get_args(data_root: str) -> dict[str, Any]:
 
 def get_data(data_paths: list[str]) -> npt.NDArray[Any]:
     '''
-    Get the sarapes from the analysis's .npy file
+    Get the CONTEST surfaces from the analysis's .npy file
     '''
     print("Fetching data...")
     datasets = [np.load(data) for data in data_paths]
@@ -169,7 +169,7 @@ def get_graphs(datasets, betas, args: dict) -> str:
             ax.set_xlabel(ind[0] + 1)
             ax.set_ylabel(ind[1] + 1)
             for group in range(datasets.shape[0]):
-                # Finally, graph emperical (hist) and theoretical (plot) pdfs for each SARAPE surface
+                # Finally, graph emperical (hist) and theoretical (plot) pdfs for each CONTEST surface
                 group_ind = (group, *ind)
                 mpl.rcParams["hatch.color"] = args["colors"][group]
 
@@ -250,7 +250,7 @@ def get_graphs(datasets, betas, args: dict) -> str:
 
     ## * Labeling
     graph_form = "CDF" if args["is_cdf"] else "PDF"
-    fig.suptitle(f"Various SARAPE Emperical vs. Theoretical {graph_form}s")
+    fig.suptitle(f"Various CONTEST Emperical vs. Theoretical {graph_form}s")
     fig.supxlabel("Observer Count")
     fig.supylabel("Case Count")
     return graph_form
