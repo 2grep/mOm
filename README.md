@@ -1,29 +1,16 @@
-# Preface
+# CONTEST
+
+## Preface
 None of the errors herein are mine, the editors are conspiring against me.
 
-# Expected Folders and Setup
-- data/prostate_reader/assisted_5class.npy
-- data/prostate_reader/unassisted_5class.npy
-
-# Original Data
-- data/
-    - prostate_reader/
-        - assisted_5class.csv
-        - unassisted_5class.csv
-    - nottingham/
-        - mitosis.csv
-        - nottingham.csv
-        - pleomorphismus.csv
-        - tubulus.csv
-
-# Instructions
+## Instructions
 > Instructions last updated 2024-02-27
 > These have not been tested for anything other than comparing exactly 2 sets of data at a time
 
 The analysis starts with `onest_analysis.py` to perform the ONEST and/or CONTEST analyses on the CSV data.
 Make sure to cache this to create the appropriate NPYs used in the other programs.
 
-## Getting Started
+### Getting Started
 These instructions assume you have the commands [`git`][git-download] and [`python3.12`][python3.12-download] installed on your machine. If you do not have `python3.12`, you may download it [directly][python3.12-download] or as a standalone program in most package managers. Furthermore, we assume you have a basic understanding of the terminal and navigation therein.
 
 Open a terminal and navigate to the folder you want this repository to be under (for the sake of example, these instructions will call said folder `root`). From `root`, copy this repository with SSH with the following command:
@@ -49,7 +36,7 @@ root/
 [git-download]: https://git-scm.com/downloads
 [python3.12-download]: https://www.python.org/downloads/release/python-3122/
 
-### Setup Virtual Environment
+#### Setup Virtual Environment
 While not strictly necessary, it is highly recommended to run the code in this repository under a virtual environment. If you do *not* want to use a venv, skip straight to [Install Dependencies](#-install-dependencies). For more thorough instructions, see [the official `venv` documentation][venv-docs]. Here we give a basic overview of what is needed in a bash shell:
 1. Navigate to `root/CONTEST`
 2. Create the virtual environment: Run `python3.12 -m venv .venv`
@@ -79,7 +66,7 @@ root/
 
 Once you are done with executing the code in this repository, you may execute the command `deactive` to deactivate the environment. The environment may be reactivated at any time with the command in step (3) above.
 
-### Install Dependencies
+#### Install Dependencies
 From `root/CONTEST`, install the requirements with the following command:
 ```bash
 pip3 install -r requirements.txt
@@ -88,7 +75,7 @@ pip3 install -r requirements.txt
 In the terminal, navigate to the `CONTEST` folder. From here on, subsequent terminal commans will assume the terminal is currently in the `CONTEST` folder.
 
 [venv-docs]: https://docs.python.org/3/library/venv.html#creating-virtual-environments
-## CONTEST/ONEST Analysis
+### CONTEST/ONEST Analysis
 1. Place `.csv` data files in the same folder. This folder should be in the folder `./data/`.
     - For the sake of example, these instructions will call the folder `my_data` and the files `treatment.csv` and `control.csv`.
     > There are a few assumptions made about the datasets that should be ensured ahead of time:
@@ -151,20 +138,20 @@ Subsequent analyses especially require the prescence of the `.npy` file created 
 
 [mpl-colors]: https://matplotlib.org/stable/gallery/color/named_colors.html
 
-### Running Already Analyzed Data
+#### Running Already Analyzed Data
 Since running the analysis can take a lot of time, you can re-run the plotting after obtaining the cached `.npy` files by simply replacing the `.csv` with `.npy` in the `dataset_names` on lines 18 and 19. The program will skip the analysis part, significantly speeding up graphical analysis.
 
-# Thoughts and Notes
-## Random, Unique Permutations
+## Thoughts and Notes
+### Random, Unique Permutations
 As described in the [original paper][onest-paper], the ONEST/CONTEST manifolds are (theoretically) random and unique permutations of the observers (and cases). This means that, for 20 observers and 240 cases, there should be $19!$ (about $1.2 \times 10^{17}$) ONEST curves. Likewise, there should be $19! \cdot 240!$ (about $4.9 \times 10^{485}$) CONTEST surfaces. In practice, the number of CONTEST surfaces is bounded above by the respective number of ONEST curves. This is because we get the observers and cases for a surface at the same time (see `onest_analysis.py:102`). Also, if the number of unique manifolds is set greater than the factorial of one less than the number of observers, the code is liable to enter an infinite loop trying to find the next set of observers for a surface.
 
-## 3D Graphing
+### 3D Graphing
 The graphing of the CONTEST analysis can be very odd and glitchy. This is a [documented artifact in matplotlib][mpl-mplot3d-faq] and it is suggested to use [Mayavi] (we have not made this switch).
 
 [mpl-mplot3d-faq]: https://matplotlib.org/3.8.3/api/toolkits/mplot3d/faq.html#my-3d-plot-doesn-t-look-right-at-certain-viewing-angles
 [Mayavi]: https://docs.enthought.com/mayavi/mayavi/.
 
-# TODO
+## TODO
 - Walk through the data folder for the data
 - Rename all instances of sarape to contest if possible
 - Do better `get_args`
@@ -197,7 +184,7 @@ for root, subdirs, files in os.walk(sys.argv[1]):
         nameBool, ext = nameCheck(path)
 ```
 
-# Future Considerations
+## Future Considerations
 We calculate the OPA as the proportion of the number of observer agreements to total number of cases. There may be multiple ways to calculate this. The [FDA discuss overall percent agreement][fda-opa] in a 2-class positive vs. negative context.
 
 [fda-opa]: https://www.fda.gov/files/medical%20devices/published/Guidance-for-Industry-and-FDA-Staff---Statistical-Guidance-on-Reporting-Results-from-Studies-Evaluating-Diagnostic-Tests-%28PDF-Version%29.pdf
