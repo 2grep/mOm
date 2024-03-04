@@ -154,7 +154,7 @@ The graphing of the CONTEST analysis can be very odd and glitchy. This is a [doc
 ## TODO
 - Walk through the data folder for the data
 - Do better `get_args`
-- Automatically create sarapes in alpha.py:get_data
+- Automatically create CONTEST surfaces in alpha.py:get_data
 - Choose consistent way to convert list to ndarray (note when other is necessary)
     - `np.array`
     - `np.asarray`
@@ -166,13 +166,13 @@ The graphing of the CONTEST analysis can be very odd and glitchy. This is a [doc
 - Add detailed docstrings with parameter and return types
 - Make sure eveything sends to the same results directory
 
-- Cleanup
-- `pip3 freeze > requirements.txt`
 - includes `examples` folder
     - Add
         - prostate_reader (DOI: 10.1001/jamanetworkopen.2020.23267)
         - nottingham (DOI: 10.1016/j.prp.2021.153718)
         - [PDL1](https://cran.r-project.org/web/packages/ONEST/index.html) (doi:10.1038/s41379-020-0544-x)
+- Clean sample data
+- Add notes about which sample data files to use in comparison
 - Write up instructions on running some data from the beginning
 - Get dad to run PDL1 from instructions I write up
 
